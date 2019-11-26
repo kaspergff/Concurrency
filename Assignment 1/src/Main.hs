@@ -87,3 +87,19 @@ data Lock = Lock  -- TODO
 interlocked :: Lock -> IO a -> IO a
 interlocked lock action = do
   action
+
+
+
+
+
+
+--Mtest bs
+digs :: Int -> [Int]
+digs 0 = []
+digs x = digs (x `div` 10) ++ [x `mod` 10]
+
+weights :: Int -> [Int]
+weights n = reverse [1..(length (digs n))]
+
+mtest :: Int -> Int -> Bool
+mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0 
