@@ -26,6 +26,8 @@ main = do
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   case cfgMode config of
+    Count -> putStrLn "Count"
+    List  -> putStrLn "List"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
       | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
@@ -89,6 +91,19 @@ interlocked lock action = do
   action
 
 
+countMode :: Int -> Int -> Int -> Int
+countMode lower upper modulo = length [x | x <- [lower..(upper-1)], mtest x modulo]
+
+
+-- countMVar :: Int ->  IO ()
+-- countMVar treads = do
+--   counter <- createEmptyMVar 
+--   return ()
+
+makeFork 0 _ = return ()
+makeFork n f = do
+  forkIO f
+  makeFork (n-1) f
 
 --getrange
 getallrange:: Int -> Int -> [Int]
