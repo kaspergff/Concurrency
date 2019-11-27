@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Concurrent
---import Control.Concurrent.Async
+import Control.Concurrent.Async
 import Control.Monad
 import System.Environment
 import System.IO
@@ -105,7 +105,6 @@ atomCAS ptr old new =
     atomicModifyIORef' ptr (\ cur -> if cur == old
                                     then (new, True)
                                     else (cur, False))
-
 
 
 countIORef :: Int -> [Int] -> Int -> IO ()

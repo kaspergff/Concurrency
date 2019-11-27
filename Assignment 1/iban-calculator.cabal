@@ -37,4 +37,5 @@ executable iban-calculator
     , bytestring
     , cryptohash-sha1
     , dejafu
+    , async
 
