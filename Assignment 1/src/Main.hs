@@ -106,10 +106,10 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 
 makeFork :: Int -> [Int] -> Int -> IO ()
 makeFork 0 _ _ = return ()
-makeFork 1 ints modulo  = forkIO $ countMode1 modulo 
+makeFork 1 ints modulo  = forkIO $ countMode1 ints modulo 
 makeFork n ints modulo  = do
   forkIO (countMode (getListPart n ints) modulo)
-  makeFork (n-1) 
+  makeFork (n-1) ints modulo
 
 getListPart :: (Monad m, RealFrac a) => a -> [b] -> m [b]
 getListPart 1 xs = return xs
