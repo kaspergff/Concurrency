@@ -13,6 +13,8 @@ import Data.Word
 import Data.List (elemIndex, (\\) )
 import Data.Maybe (fromMaybe)
 import Crypto.Hash.SHA1
+--import Ioref
+--import Mvar
 
 
 main :: IO ()
@@ -96,7 +98,7 @@ data Lock = Unlocked | Locked deriving Eq
 type IOLock = IORef Lock
 
 -- Guard some action using the given lock
---
+
 interlocked :: IOLock -> IO a -> IO ()
 interlocked lock ac = do
   access <- atomCAS lock Unlocked Locked
@@ -107,13 +109,11 @@ interlocked lock ac = do
   else
     interlocked lock ac
 
-
 atomCAS :: Eq a => IORef a -> a -> a -> IO Bool
 atomCAS ptr old new =
     atomicModifyIORef' ptr (\ cur -> if cur == old
                                     then (new, True)
                                     else (cur, False))
-
 
 countIORef :: Int -> [Int] -> Int -> IO ()
 countIORef threads list modulo = do
@@ -165,19 +165,18 @@ makeForkMVar c n ints modulo  = do
     putMVar c (old + count)
   makeForkMVar c (n-1) (ints \\ (getListPart n ints)) modulo
 
-
 --split list, get the first Nth part of the list  
 getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
 getListPart n list = take (floor (1 / (fromIntegral n) * (fromIntegral $ length list))) list
  
 --Mtest functions
-digs :: Int -> [Int]
-digs 0 = []
-digs x = digs (x `div` 10) ++ [x `mod` 10]
+digits :: Int -> [Int]
+digits 0 = []
+digits x = digs (x `div` 10) ++ [x `mod` 10]
 
 weights :: Int -> [Int]
-weights n = reverse [1..(length (digs n))]
+weights n = reverse [1..(length (digits n))]
 
 mtest :: Int -> Int -> Bool
 mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
@@ -228,17 +227,18 @@ mVarListFork n ints modulo right  = do
     listMode (getListPart n ints) modulo right
   mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right
 
-
 --mtest for every Nth thread
 listMode :: [Int] -> Int -> MVar Int -> IO()
 listMode [] _ _ = return ()
 listMode (x:xs) modulo right =  if mtest x modulo 
     then do
+     
       v <- takeMVar right
       putStr ((show v) ++ "  ")
       putStrLn (show x) 
       listMode xs modulo right
       putMVar right (v+1)
+
     else do
       listMode xs modulo right
 
