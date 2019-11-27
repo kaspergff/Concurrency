@@ -129,3 +129,14 @@ weights n = reverse [1..(length (digs n))]
 
 mtest :: Int -> Int -> Bool
 mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0 
+
+--length map mtest getallrange
+
+--makefork Int -> IO a
+--makefork 0 = return
+--makefork n = do
+   --forkIO countmode 
+   --makefork n-1
+
+
+--map forkIO length[x| x [lower..(upper-1)], mtest x 11]
