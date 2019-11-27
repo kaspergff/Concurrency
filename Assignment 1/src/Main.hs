@@ -93,14 +93,6 @@ interlocked :: Lock -> IO a -> IO a
 interlocked lock action = do
   action
 
-
-countMode1 :: [Int] -> Int -> Int
-countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest x modulo]
-
-countMode :: [Int] -> Int -> Int
-countMode list modulo = length [x | x <- list, mtest x modulo]
-
-
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
   counter <- newMVar 0 
@@ -114,14 +106,15 @@ makeFork c 1 ints modulo  = do
   return ()
 makeFork c n ints modulo  = do
   forkIO $ putStrLn $ show(countMode (getListPart n ints) modulo)
-  makeFork c (n-1) ints modulo
+  makeFork c (n-1) (ints \\ getListPart n ints) modulo
 
+
+--split list, get the first Nth part of the list  
 getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
 getListPart n list = take (floor (1 / (fromIntegral n) * (fromIntegral $ length list))) list
  
-
---Mtest bs
+--Mtest functions
 digs :: Int -> [Int]
 digs 0 = []
 digs x = digs (x `div` 10) ++ [x `mod` 10]
@@ -130,17 +123,12 @@ weights :: Int -> [Int]
 weights n = reverse [1..(length (digs n))]
 
 mtest :: Int -> Int -> Bool
-mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0 
+mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
 
---length map mtest getallrange
+--mtest for every 1st thread
+countMode1 :: [Int] -> Int -> Int
+countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest x modulo]
 
---makefork Int -> IO a
---makefork 0 = return
---makefork n = do
-   --forkIO countmode 
-   --makefork n-1
-
-
-
-
---map forkIO length[x| x [lower..(upper-1)], mtest x 11]
+--mtest for every Nth thread
+countMode :: [Int] -> Int -> Int
+countMode list modulo = length [x | x <- list, mtest x modulo]
