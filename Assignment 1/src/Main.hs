@@ -9,7 +9,7 @@ import Data.ByteString.Char8           ( ByteString )
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as B8
 import Data.Word
-import Data.List (elemIndex)
+import Data.List (elemIndex, (\\) )
 import Data.Maybe (fromMaybe)
 import Crypto.Hash.SHA1
 
@@ -29,7 +29,7 @@ main = do
 
 
   case cfgMode config of
-    Count -> makeFork (cfgThreads config) ints (cfgModulus config)
+    Count -> countMVar (cfgThreads config) ints (cfgModulus config)
     List  -> putStrLn "List"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
@@ -104,17 +104,28 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
   counter <- newMVar 0 
-  makeFork counter treads list modulo
-  return ()
+  makeFork counter threads list modulo
+  c <- takeMVar counter
+  putStrLn (show c)
 
-makeFork :: MVar -> Int -> [Int] -> Int -> IO ()
+makeFork :: MVar Int -> Int -> [Int] -> Int -> IO ()
 makeFork c 0 _ _ = return ()
 makeFork c 1 ints modulo  = do
-  forkIO $ putStrLn $ show (countMode1 ints modulo)
+  forkIO $ do 
+    let count = countMode1 ints modulo
+    old <- takeMVar c
+    let new = old + count
+    putMVar c new
+    threadDelay 1000
   return ()
 makeFork c n ints modulo  = do
-  forkIO $ putStrLn $ show(countMode (getListPart n ints) modulo)
-  makeFork c (n-1) ints modulo
+  forkIO $ do
+    let count = countMode (getListPart n ints) modulo
+    old <- takeMVar c
+    let new = old + count
+    putMVar c new
+    threadDelay 1000
+  makeFork c (n-1) (ints \\ (getListPart n ints)) modulo
 
 getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
