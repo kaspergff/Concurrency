@@ -26,6 +26,7 @@ main = do
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   let ints = [(cfgLower config)..(cfgUpper config)]
+  
 
   case cfgMode config of
     Count -> makeFork (cfgThreads config) ints (cfgModulus config)
