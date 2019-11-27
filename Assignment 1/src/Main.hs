@@ -31,12 +31,10 @@ main = do
 
 
   case cfgMode config of
-    Count -> do
-      counter <- newMVar 0 
-      makeFork counter (cfgThreads config) ints (cfgModulus config)
-      threadDelay 1000
-      c <- takeMVar counter
-      putStrLn (show c)
+    Count -> case cfgSync config of
+      SyncMVar -> do countMVar (cfgThreads config) ints (cfgModulus config)
+      SyncIORef -> putStrLn "TODODODODODOOD" 
+      
     List  -> putStrLn "List"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
@@ -110,8 +108,9 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
-  counter <- newMVar 0
-  makeFork counter threads list modulo 
+  counter <- newMVar 0 
+  makeFork counter threads list modulo
+  threadDelay 1000
   c <- takeMVar counter
   putStrLn (show c)
 
