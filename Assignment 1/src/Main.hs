@@ -26,10 +26,17 @@ main = do
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   let ints = [(cfgLower config)..(cfgUpper config)]
+  
+
 
 
   case cfgMode config of
-    Count -> countMVar (cfgThreads config) ints (cfgModulus config)
+    Count -> do
+      counter <- newMVar 0 
+      makeFork counter (cfgThreads config) ints (cfgModulus config)
+      threadDelay 1000
+      c <- takeMVar counter
+      putStrLn (show c)
     List  -> putStrLn "List"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
@@ -103,28 +110,26 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
-  counter <- newMVar 0 
-  makeFork counter threads list modulo
+  counter <- newMVar 0
+  makeFork counter threads list modulo 
   c <- takeMVar counter
   putStrLn (show c)
 
 makeFork :: MVar Int -> Int -> [Int] -> Int -> IO ()
-makeFork c 0 _ _ = return ()
+makeFork _ 0 _ _ = return ()
 makeFork c 1 ints modulo  = do
-  forkIO $ do 
+  _ <- forkIO $ do 
     let count = countMode1 ints modulo
     old <- takeMVar c
-    let new = old + count
-    putMVar c new
-    threadDelay 1000
+    putMVar c (old + count)
+    threadDelay 10000
   return ()
 makeFork c n ints modulo  = do
-  forkIO $ do
+  _ <- forkIO $ do
     let count = countMode (getListPart n ints) modulo
     old <- takeMVar c
-    let new = old + count
-    putMVar c new
-    threadDelay 1000
+    putMVar c (old + count)
+    threadDelay 10000
   makeFork c (n-1) (ints \\ (getListPart n ints)) modulo
 
 getListPart :: Int -> [Int] -> [Int]
