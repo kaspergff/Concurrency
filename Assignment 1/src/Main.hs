@@ -34,8 +34,10 @@ main = do
       SyncIORef -> do countIORef (cfgThreads config) ints (cfgModulus config)
       
     List  -> case cfgSync config of
-      SyncMVar -> do mVarList (cfgThreads config) ints (cfgModulus config)
-      SyncIORef -> putStrLn "fakkedeezisnognietaf"
+      SyncMVar -> do 
+        foo <- async $ mVarList (cfgThreads config) ints (cfgModulus config)
+        wait foo
+      SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
       | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
@@ -189,6 +191,25 @@ countMode1 l@(x:_) modulo = countMode [x..((last l)-1)] modulo
 countMode :: [Int] -> Int -> Int
 countMode list modulo = length [x | x <- list, mtest x modulo]
 
+iORefList :: Int -> [Int] -> Int -> IO ()
+iORefList threads list modulo = do
+  lock <- newIORef Unlocked
+  iORefListFork threads list modulo lock
+  return ()
+
+iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IO ()
+iORefListFork 0 _ _ _ = return ()
+iORefListFork 1 ints modulo lock = do
+  _ <- forkIO $ do 
+    interlocked lock (listMode1IORef ints modulo)
+  return ()
+iORefListFork n ints modulo lock  = do
+  _ <- forkIO $ do
+    interlocked lock (listModeIORef (getListPart n ints) modulo)
+  iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock
+
+
+
 --listmode
 mVarList :: Int -> [Int] -> Int -> IO ()
 mVarList threads list modulo = do
@@ -224,4 +245,19 @@ listMode (x:xs) modulo right =  if mtest x modulo
 listMode1 :: [Int] -> Int -> MVar Int -> IO()
 listMode1 [] _ _ = return ()
 listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
+
+
+listModeIORef :: [Int] -> Int -> IO()
+listModeIORef [] _ = return ()
+listModeIORef (x:xs) modulo =  if mtest x modulo 
+    then do
+      putStr "  "
+      putStrLn (show x) 
+      listModeIORef xs modulo
+    else do
+      listModeIORef xs modulo
+
+listMode1IORef :: [Int] -> Int -> IO()
+listMode1IORef [] _  = return ()
+listMode1IORef l@(x:_) modulo = listModeIORef [x..((last l)-1)] modulo 
                       
