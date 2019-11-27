@@ -91,22 +91,33 @@ interlocked lock action = do
   action
 
 
-countMode :: Int -> Int -> Int -> Int
-countMode lower upper modulo = length [x | x <- [lower..(upper-1)], mtest x modulo]
+countMode1 :: [Int] -> Int -> Int
+countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest x modulo]
+
+countMode :: [Int] -> Int -> Int
+countMode list modulo = length [x | x <- list, mtest x modulo]
 
 
 -- countMVar :: Int ->  IO ()
--- countMVar treads = do
+-- countMVar treads lower upper = do
 --   counter <- createEmptyMVar 
+--   makeFork treads (countMode )
 --   return ()
 
-makeFork 0 _ = return ()
-makeFork n f = do
-  forkIO f
-  makeFork (n-1) f
+makeFork :: Int -> [Int] -> Int -> IO ()
+makeFork 0 _ _ = return ()
+makeFork 1 ints modulo  = forkIO $ countMode1 modulo 
+makeFork n ints modulo  = do
+  forkIO (countMode (getListPart n ints) modulo)
+  makeFork (n-1) 
 
-
-
+getListPart :: (Monad m, RealFrac a) => a -> [b] -> m [b]
+getListPart 1 xs = return xs
+getListPart n s@(x:xs) = do
+  let p = 1 / n * (fromIntegral $ length s)
+  let items = take (floor p) s
+  return items
+ 
 
 --Mtest bs
 digs :: Int -> [Int]
