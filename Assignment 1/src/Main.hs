@@ -151,27 +151,27 @@ action c count = do
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
   counter <- newMVar 0 
-  makeFork counter threads list modulo
+  makeForkMVar counter threads list modulo
   threadDelay 1000
   c <- takeMVar counter
   putStrLn (show c)
 
-makeFork :: MVar Int -> Int -> [Int] -> Int -> IO ()
-makeFork _ 0 _ _ = return ()
-makeFork c 1 ints modulo  = do
+makeForkMVar :: MVar Int -> Int -> [Int] -> Int -> IO ()
+makeForkMVar _ 0 _ _ = return ()
+makeForkMVar c 1 ints modulo  = do
   _ <- forkIO $ do 
     let count = countMode1 ints modulo
     old <- takeMVar c
     putMVar c (old + count)
     threadDelay 10000
   return ()
-makeFork c n ints modulo  = do
+makeForkMVar c n ints modulo  = do
   _ <- forkIO $ do
     let count = countMode (getListPart n ints) modulo
     old <- takeMVar c
     putMVar c (old + count)
     threadDelay 10000
-  makeFork c (n-1) (ints \\ (getListPart n ints)) modulo
+  makeForkMVar c (n-1) (ints \\ (getListPart n ints)) modulo
 
 
 --split list, get the first Nth part of the list  
@@ -203,22 +203,22 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 --listmode
 putList :: Int -> [Int] -> Int -> IO ()
 putList threads list modulo = do
-  makeFork' threads list modulo
+  makeForkMVar' threads list modulo
   threadDelay 1000
   return ()
 
-makeFork' :: Int -> [Int] -> Int -> IO ()
-makeFork' 0 _ _ = return ()
-makeFork' 1 ints modulo  = do
+makeForkMVar' :: Int -> [Int] -> Int -> IO ()
+makeForkMVar' 0 _ _ = return ()
+makeForkMVar' 1 ints modulo  = do
   _ <- forkIO $ do 
     listMode1 ints modulo
     threadDelay 10000
   return ()
-makeFork' n ints modulo  = do
+makeForkMVar' n ints modulo  = do
   _ <- forkIO $ do
     listMode (getListPart n ints) modulo
     threadDelay 10000
-  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo
+  makeForkMVar' (n-1) (ints \\ (getListPart n ints)) modulo
 
 
 --mtest for every Nth thread
