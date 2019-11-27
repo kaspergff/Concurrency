@@ -26,7 +26,7 @@ main = do
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   case cfgMode config of
-    Count -> putStrLn "Count"
+    Count -> count'
     List  -> putStrLn "List"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
@@ -100,6 +100,7 @@ countMode lower upper modulo = length [x | x <- [lower..(upper-1)], mtest x modu
 --   counter <- createEmptyMVar 
 --   return ()
 
+makeFork :: (Eq t, Num t) => t -> IO () -> IO ()
 makeFork 0 _ = return ()
 makeFork n f = do
   forkIO f
@@ -128,5 +129,9 @@ mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
    --forkIO countmode 
    --makefork n-1
 
+
+count' l = do
+  v <- forkIO $ countMode 100000000 999999999 11
+  putStrLn (Show v)
 
 --map forkIO length[x| x [lower..(upper-1)], mtest x 11]
