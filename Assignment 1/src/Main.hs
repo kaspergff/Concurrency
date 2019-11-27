@@ -9,7 +9,7 @@ import Data.ByteString.Char8           ( ByteString )
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as B8
 import Data.Word
-import Data.List (elemIndex)
+import Data.List (elemIndex, (\\) )
 import Data.Maybe (fromMaybe)
 import Crypto.Hash.SHA1
 
@@ -26,11 +26,18 @@ main = do
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   let ints = [(cfgLower config)..(cfgUpper config)]
+  
+
 
 
   case cfgMode config of
-    Count -> makeFork (cfgThreads config) ints (cfgModulus config)
-    List  -> putStrLn "List"
+    Count -> case cfgSync config of
+      SyncMVar -> do countMVar (cfgThreads config) ints (cfgModulus config)
+      SyncIORef -> putStrLn "TODODODODODOOD" 
+      
+    List  -> case cfgSync config of
+      SyncMVar -> do putList (cfgThreads config) ints (cfgModulus config)
+      SyncIORef -> putStrLn "fakkedeezisnognietaf"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
       | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
@@ -96,17 +103,27 @@ interlocked lock action = do
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
   counter <- newMVar 0 
-  makeFork counter treads list modulo
-  return ()
+  makeFork counter threads list modulo
+  threadDelay 1000
+  c <- takeMVar counter
+  putStrLn (show c)
 
-makeFork :: MVar -> Int -> [Int] -> Int -> IO ()
-makeFork c 0 _ _ = return ()
+makeFork :: MVar Int -> Int -> [Int] -> Int -> IO ()
+makeFork _ 0 _ _ = return ()
 makeFork c 1 ints modulo  = do
-  forkIO $ putStrLn $ show (countMode1 ints modulo)
+  _ <- forkIO $ do 
+    let count = countMode1 ints modulo
+    old <- takeMVar c
+    putMVar c (old + count)
+    threadDelay 10000
   return ()
 makeFork c n ints modulo  = do
-  forkIO $ putStrLn $ show(countMode (getListPart n ints) modulo)
-  makeFork c (n-1) (ints \\ getListPart n ints) modulo
+  _ <- forkIO $ do
+    let count = countMode (getListPart n ints) modulo
+    old <- takeMVar c
+    putMVar c (old + count)
+    threadDelay 10000
+  makeFork c (n-1) (ints \\ (getListPart n ints)) modulo
 
 
 --split list, get the first Nth part of the list  
@@ -125,10 +142,48 @@ weights n = reverse [1..(length (digs n))]
 mtest :: Int -> Int -> Bool
 mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
 
+
+
 --mtest for every 1st thread
 countMode1 :: [Int] -> Int -> Int
-countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest x modulo]
+countMode1 l@(x:_)  = countMode [x..((last l)-1)]  
 
 --mtest for every Nth thread
 countMode :: [Int] -> Int -> Int
 countMode list modulo = length [x | x <- list, mtest x modulo]
+
+
+--listmode
+putList :: Int -> [Int] -> Int -> IO ()
+putList threads list modulo = do
+  makeFork' threads list modulo
+  threadDelay 1000
+  return ()
+
+makeFork' :: Int -> [Int] -> Int -> IO ()
+makeFork' 0 _ _ = return ()
+makeFork' 1 ints modulo  = do
+  _ <- forkIO $ do 
+    listMode1 ints modulo
+    threadDelay 10000
+  return ()
+makeFork' n ints modulo  = do
+  _ <- forkIO $ do
+    listMode (getListPart n ints) modulo
+    threadDelay 10000
+  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo
+
+
+--mtest for every Nth thread
+listMode :: [Int] -> Int -> IO()
+listMode [] _ = return ()
+listMode (x:xs) modulo =  if mtest x modulo 
+    then do
+      putStrLn (show x) 
+      listMode xs modulo
+    else do
+      listMode xs modulo
+
+listMode1 :: [Int] -> Int -> IO()
+listMode1 l@(x:_)  = listMode [x..((last l)-1)] 
+                      
