@@ -4,3 +4,5 @@ Assignment 2/dist/
 Assignment 2/.stack-work/
 Assignment 3/dist/
 Assignment 3/.stack-work/
+*.exe
+*.csv
