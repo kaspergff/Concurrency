@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Concurrent
+--import Control.Concurrent.Async
 import Control.Monad
 import System.Environment
 import System.IO
@@ -19,24 +20,15 @@ main = do
   hSetBuffering stdout NoBuffering
   args <- getArgs
   let config = parseConfig args
-
-  -- Do stuff here
-  putStrLn $ "I'm in program mode " ++ show (cfgMode config) ++ " with lock " ++ show (cfgSync config) ++ ","
-  putStrLn $ "performing the " ++ show (cfgModulus config) ++ "-test with " ++ show (cfgThreads config) ++ " threads"
-  putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
-
   let ints = [(cfgLower config)..(cfgUpper config)]
   
-
-
-
   case cfgMode config of
     Count -> case cfgSync config of
       SyncMVar -> do countMVar (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> do countIORef (cfgThreads config) ints (cfgModulus config)
       
     List  -> case cfgSync config of
-      SyncMVar -> do putList (cfgThreads config) ints (cfgModulus config)
+      SyncMVar -> do mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> putStrLn "fakkedeezisnognietaf"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
@@ -46,7 +38,7 @@ main = do
   -- forkIO $ replicateM_ 100 (putChar 'A')
   -- forkIO $ replicateM_ 100 (putChar 'B')
 
-  threadDelay 10000
+  threadDelay 100000
 
 -- Parses the command line arguments
 parseConfig :: [String] -> Config
@@ -131,13 +123,11 @@ makeForkIORef c lock 1 ints modulo  = do
   _ <- forkIO $ do
     let count = countMode1 ints modulo
     interlocked lock (action c count)
-    threadDelay 10000
   return ()
 makeForkIORef c lock n ints modulo = do
   _ <- forkIO $ do
     let count = countMode (getListPart n ints) modulo
     interlocked lock (action c count)
-    threadDelay 10000
   makeForkIORef c lock (n-1) (ints \\ (getListPart n ints)) modulo
 
 action c count = do 
@@ -159,14 +149,12 @@ makeForkMVar c 1 ints modulo  = do
     let count = countMode1 ints modulo
     old <- takeMVar c
     putMVar c (old + count)
-    threadDelay 10000
   return ()
 makeForkMVar c n ints modulo  = do
   _ <- forkIO $ do
     let count = countMode (getListPart n ints) modulo
     old <- takeMVar c
     putMVar c (old + count)
-    threadDelay 10000
   makeForkMVar c (n-1) (ints \\ (getListPart n ints)) modulo
 
 
@@ -197,28 +185,24 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 
 
 --listmode
-putList :: Int -> [Int] -> Int -> IO ()
-putList threads list modulo = do
+mVarList :: Int -> [Int] -> Int -> IO ()
+mVarList threads list modulo = do
   writelock <- newMVar 1
-  makeFork' threads list modulo writelock
-  threadDelay 10000
+  mVarListFork threads list modulo writelock
   return ()
 
-makeFork' :: Int -> [Int] -> Int -> MVar Int -> IO ()
-makeFork' 0 _ _ _ = return ()
-makeFork' 1 ints modulo right = do
-  
+mVarListFork :: Int -> [Int] -> Int -> MVar Int -> IO ()
+mVarListFork 0 _ _ _ = return ()
+mVarListFork 1 ints modulo right = do
   _ <- forkIO $ do 
-    
     listMode1 ints modulo right
-    threadDelay 10000
-    
+    threadDelay 100000
   return ()
-makeFork' n ints modulo right  = do
+mVarListFork n ints modulo right  = do
   _ <- forkIO $ do
     listMode (getListPart n ints) modulo right
-    threadDelay 10000
-  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo right
+    threadDelay 100000
+  mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right
 
 
 --mtest for every Nth thread
@@ -231,7 +215,6 @@ listMode (x:xs) modulo right =  if mtest x modulo
       putStrLn (show x) 
       listMode xs modulo right
       putMVar right (v+1)
-      threadDelay 10000
     else do
       listMode xs modulo right
 
