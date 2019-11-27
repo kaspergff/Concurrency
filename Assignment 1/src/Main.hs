@@ -156,22 +156,30 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 --listmode
 putList :: Int -> [Int] -> Int -> IO ()
 putList threads list modulo = do
-  makeFork' threads list modulo
-  threadDelay 1000
+  writelock <- newMVar 1
+  makeFork' threads list modulo writelock
+  threadDelay 100000
   return ()
 
-makeFork' :: Int -> [Int] -> Int -> IO ()
-makeFork' 0 _ _ = return ()
-makeFork' 1 ints modulo  = do
+makeFork' :: Int -> [Int] -> Int -> MVar Int -> IO ()
+makeFork' 0 _ _ _ = return ()
+makeFork' 1 ints modulo right = do
+  
   _ <- forkIO $ do 
+    v <- takeMVar right
+    putStr ((show v) ++ "  ")
     listMode1 ints modulo
     threadDelay 10000
+    putMVar right (v+1)
   return ()
-makeFork' n ints modulo  = do
+makeFork' n ints modulo right  = do
   _ <- forkIO $ do
+    v <- takeMVar right
+    putStr ((show v) ++ "  ")
     listMode (getListPart n ints) modulo
     threadDelay 10000
-  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo
+    putMVar right (v+1)
+  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo right
 
 
 --mtest for every Nth thread
