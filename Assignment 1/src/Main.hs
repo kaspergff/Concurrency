@@ -96,14 +96,14 @@ type IOLock = IORef Lock
 -- Guard some action using the given lock
 --
 interlocked :: IOLock -> IO a -> IO ()
-interlocked lock action = do
+interlocked lock ac = do
   access <- atomCAS lock Unlocked Locked
   if access
     then do
-      action
+      _ <- ac
       atomicModifyIORef' lock (\_ -> (Unlocked, ())) 
   else
-    interlocked lock action
+    interlocked lock ac
 
 
 atomCAS :: Eq a => IORef a -> a -> a -> IO Bool
@@ -136,6 +136,7 @@ makeForkIORef c lock n ints modulo = do
     interlocked lock (action c count)
   makeForkIORef c lock (n-1) (ints \\ (getListPart n ints)) modulo
 
+action :: Num a => IORef a -> a -> IO ()
 action c count = do 
   old <- readIORef c
   writeIORef c (old + count) 
@@ -182,7 +183,8 @@ mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
 
 --mtest for every 1st thread
 countMode1 :: [Int] -> Int -> Int
-countMode1 l@(x:_)  = countMode [x..((last l)-1)]  
+countMode1 [] _= 0
+countMode1 l@(x:_) modulo = countMode [x..((last l)-1)] modulo  
 
 --mtest for every Nth thread
 countMode :: [Int] -> Int -> Int
@@ -223,5 +225,6 @@ listMode (x:xs) modulo right =  if mtest x modulo
       listMode xs modulo right
 
 listMode1 :: [Int] -> Int -> MVar Int -> IO()
+listMode1 [] _ _ = return ()
 listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
                       
