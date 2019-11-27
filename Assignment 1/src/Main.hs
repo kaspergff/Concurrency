@@ -33,7 +33,7 @@ main = do
   case cfgMode config of
     Count -> case cfgSync config of
       SyncMVar -> do countMVar (cfgThreads config) ints (cfgModulus config)
-      SyncIORef -> putStrLn "TODODODODODOOD" 
+      SyncIORef -> do countIORef (cfgThreads config) ints (cfgModulus config)
       
     List  -> putStrLn "List"
     Search expected
@@ -90,14 +90,27 @@ readHexadecimal c = c `elemIndex` (['0'..'9'] ++ ['a'..'f'])
 checkHash :: ByteString -> Int -> Bool
 checkHash expected value = expected == hash (B8.pack $ show value)
 
-data Lock = Lock  -- TODO
+data Lock = Unlocked | Locked deriving Eq
+type IOLock = IORef Lock
 
 -- Guard some action using the given lock
 --
-interlocked :: Lock -> IO a -> IO a
+interlocked :: IOLock -> IO a -> IO ()
 interlocked lock action = do
-  action
+  access <- atomCAS lock Unlocked Locked
+  if access
+    then do
+      action
+      atomicModifyIORef' lock (\_ -> (Unlocked, ())) 
+  else
+    interlocked lock action
 
+
+atomCAS :: Eq a => IORef a -> a -> a -> IO Bool
+atomCAS ptr old new =
+    atomicModifyIORef' ptr (\ cur -> if cur == old
+                                    then (new, True)
+                                    else (cur, False))
 
 countMode1 :: [Int] -> Int -> Int
 countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest x modulo]
@@ -105,6 +118,33 @@ countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest
 countMode :: [Int] -> Int -> Int
 countMode list modulo = length [x | x <- list, mtest x modulo]
 
+countIORef :: Int -> [Int] -> Int -> IO ()
+countIORef threads list modulo = do
+  lock <- newIORef Unlocked
+  counter <- newIORef 0 
+  makeForkIORef counter lock threads list modulo
+  threadDelay 1000
+  c <- readIORef counter
+  putStrLn (show c)
+
+makeForkIORef :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
+makeForkIORef _  _ 0 _ _ = return ()
+makeForkIORef c lock 1 ints modulo  = do
+  _ <- forkIO $ do
+    let count = countMode1 ints modulo
+    interlocked lock (action c count)
+    threadDelay 10000
+  return ()
+makeForkIORef c lock n ints modulo = do
+  _ <- forkIO $ do
+    let count = countMode (getListPart n ints) modulo
+    interlocked lock (action c count)
+    threadDelay 10000
+  makeForkIORef c lock (n-1) (ints \\ (getListPart n ints)) modulo
+
+action c count = do 
+  old <- readIORef c
+  writeIORef c (old + count) 
 
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
@@ -146,14 +186,3 @@ weights n = reverse [1..(length (digs n))]
 
 mtest :: Int -> Int -> Bool
 mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0 
-
---length map mtest getallrange
-
---makefork Int -> IO a
---makefork 0 = return
---makefork n = do
-   --forkIO countmode 
-   --makefork n-1
-
-
---map forkIO length[x| x [lower..(upper-1)], mtest x 11]
