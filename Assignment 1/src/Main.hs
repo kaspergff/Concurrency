@@ -26,7 +26,7 @@ main = do
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   let ints = [(cfgLower config)..(cfgUpper config)]
-  
+
 
   case cfgMode config of
     Count -> makeFork (cfgThreads config) ints (cfgModulus config)
@@ -101,24 +101,24 @@ countMode :: [Int] -> Int -> Int
 countMode list modulo = length [x | x <- list, mtest x modulo]
 
 
--- countMVar :: Int ->  IO ()
--- countMVar treads lower upper = do
---   counter <- createEmptyMVar 
---   makeFork treads (countMode )
---   return ()
+countMVar :: Int -> [Int] -> Int -> IO ()
+countMVar threads list modulo = do
+  counter <- newMVar 0 
+  makeFork counter treads list modulo
+  return ()
 
-makeFork :: RealFrac t => t -> [Int] -> Int -> IO ()
-makeFork 0 _ _ = return ()
-makeFork 1 ints modulo  = do
+makeFork :: MVar -> Int -> [Int] -> Int -> IO ()
+makeFork c 0 _ _ = return ()
+makeFork c 1 ints modulo  = do
   forkIO $ putStrLn $ show (countMode1 ints modulo)
   return ()
-makeFork n ints modulo  = do
+makeFork c n ints modulo  = do
   forkIO $ putStrLn $ show(countMode (getListPart n ints) modulo)
-  makeFork (n-1) ints modulo
+  makeFork c (n-1) ints modulo
 
-getListPart :: RealFrac a1 => a1 -> [a2] -> [a2]
+getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
-getListPart n list = take (floor (1 / n * (fromIntegral $ length list))) list
+getListPart n list = take (floor (1 / (fromIntegral n) * (fromIntegral $ length list))) list
  
 
 --Mtest bs
