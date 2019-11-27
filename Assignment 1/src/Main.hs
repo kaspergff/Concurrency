@@ -114,11 +114,7 @@ atomCAS ptr old new =
                                     then (new, True)
                                     else (cur, False))
 
-countMode1 :: [Int] -> Int -> Int
-countMode1 list modulo = length [x | x <- [(head list)..((last list) -1)], mtest x modulo]
 
-countMode :: [Int] -> Int -> Int
-countMode list modulo = length [x | x <- list, mtest x modulo]
 
 countIORef :: Int -> [Int] -> Int -> IO ()
 countIORef threads list modulo = do
@@ -203,34 +199,42 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 --listmode
 putList :: Int -> [Int] -> Int -> IO ()
 putList threads list modulo = do
-  makeForkMVar' threads list modulo
-  threadDelay 1000
+  writelock <- newMVar 1
+  makeFork' threads list modulo writelock
+  threadDelay 10000
   return ()
 
-makeForkMVar' :: Int -> [Int] -> Int -> IO ()
-makeForkMVar' 0 _ _ = return ()
-makeForkMVar' 1 ints modulo  = do
+makeFork' :: Int -> [Int] -> Int -> MVar Int -> IO ()
+makeFork' 0 _ _ _ = return ()
+makeFork' 1 ints modulo right = do
+  
   _ <- forkIO $ do 
-    listMode1 ints modulo
+    
+    listMode1 ints modulo right
     threadDelay 10000
+    
   return ()
-makeForkMVar' n ints modulo  = do
+makeFork' n ints modulo right  = do
   _ <- forkIO $ do
-    listMode (getListPart n ints) modulo
+    listMode (getListPart n ints) modulo right
     threadDelay 10000
-  makeForkMVar' (n-1) (ints \\ (getListPart n ints)) modulo
+  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo right
 
 
 --mtest for every Nth thread
-listMode :: [Int] -> Int -> IO()
-listMode [] _ = return ()
-listMode (x:xs) modulo =  if mtest x modulo 
+listMode :: [Int] -> Int -> MVar Int -> IO()
+listMode [] _ _ = return ()
+listMode (x:xs) modulo right =  if mtest x modulo 
     then do
+      v <- takeMVar right
+      putStr ((show v) ++ "  ")
       putStrLn (show x) 
-      listMode xs modulo
+      listMode xs modulo right
+      putMVar right (v+1)
+      threadDelay 10000
     else do
-      listMode xs modulo
+      listMode xs modulo right
 
-listMode1 :: [Int] -> Int -> IO()
-listMode1 l@(x:_)  = listMode [x..((last l)-1)] 
+listMode1 :: [Int] -> Int -> MVar Int -> IO()
+listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
                       
