@@ -194,19 +194,17 @@ mVarList :: Int -> [Int] -> Int -> IO ()
 mVarList threads list modulo = do
   writelock <- newMVar 1
   mVarListFork threads list modulo writelock
-  return ()
+  return()
 
 mVarListFork :: Int -> [Int] -> Int -> MVar Int -> IO ()
 mVarListFork 0 _ _ _ = return ()
 mVarListFork 1 ints modulo right = do
   _ <- forkIO $ do 
     listMode1 ints modulo right
-    threadDelay 100000
   return ()
 mVarListFork n ints modulo right  = do
   _ <- forkIO $ do
     listMode (getListPart n ints) modulo right
-    threadDelay 100000
   mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right
 
 
