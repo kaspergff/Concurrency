@@ -25,16 +25,18 @@ main = do
   putStrLn $ "performing the " ++ show (cfgModulus config) ++ "-test with " ++ show (cfgThreads config) ++ " threads"
   putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
+  let ints = [(cfgLower config)..(cfgUpper config)]
+
   case cfgMode config of
-    Count -> putStrLn "Count"
+    Count -> makeFork (cfgThreads config) ints (cfgModulus config)
     List  -> putStrLn "List"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
       | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
     _ -> return ()
 
-  forkIO $ replicateM_ 100 (putChar 'A')
-  forkIO $ replicateM_ 100 (putChar 'B')
+  -- forkIO $ replicateM_ 100 (putChar 'A')
+  -- forkIO $ replicateM_ 100 (putChar 'B')
 
   threadDelay 10000
 
@@ -104,7 +106,7 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 --   makeFork treads (countMode )
 --   return ()
 
---makeFork :: Int -> [Int] -> Int -> IO ()
+makeFork :: RealFrac t => t -> [Int] -> Int -> IO ()
 makeFork 0 _ _ = return ()
 makeFork 1 ints modulo  = do
   forkIO $ putStrLn $ show (countMode1 ints modulo)
