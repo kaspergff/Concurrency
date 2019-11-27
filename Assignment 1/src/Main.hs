@@ -21,9 +21,9 @@ main = do
   let config = parseConfig args
 
   -- Do stuff here
-  putStrLn $ "I'm in program mode " ++ show (cfgMode config) ++ " with lock " ++ show (cfgSync config) ++ ","
-  putStrLn $ "performing the " ++ show (cfgModulus config) ++ "-test with " ++ show (cfgThreads config) ++ " threads"
-  putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
+ -- putStrLn $ "I'm in program mode " ++ show (cfgMode config) ++ " with lock " ++ show (cfgSync config) ++ ","
+ -- putStrLn $ "performing the " ++ show (cfgModulus config) ++ "-test with " ++ show (cfgThreads config) ++ " threads"
+ -- putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   let ints = [(cfgLower config)..(cfgUpper config)]
   
@@ -186,7 +186,6 @@ weights n = reverse [1..(length (digs n))]
 mtest :: Int -> Int -> Bool
 mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
 
-
 --mtest for every 1st thread
 countMode1 :: [Int] -> Int -> Int
 countMode1 l@(x:_)  = countMode [x..((last l)-1)]  
@@ -195,13 +194,11 @@ countMode1 l@(x:_)  = countMode [x..((last l)-1)]
 countMode :: [Int] -> Int -> Int
 countMode list modulo = length [x | x <- list, mtest x modulo]
 
-
 --listmode
 putList :: Int -> [Int] -> Int -> IO ()
 putList threads list modulo = do
   writelock <- newMVar 1
   makeFork' threads list modulo writelock
-  threadDelay 10000
   return ()
 
 makeFork' :: Int -> [Int] -> Int -> MVar Int -> IO ()
@@ -211,13 +208,11 @@ makeFork' 1 ints modulo right = do
   _ <- forkIO $ do 
     
     listMode1 ints modulo right
-    threadDelay 10000
     
   return ()
 makeFork' n ints modulo right  = do
   _ <- forkIO $ do
     listMode (getListPart n ints) modulo right
-    threadDelay 10000
   makeFork' (n-1) (ints \\ (getListPart n ints)) modulo right
 
 
@@ -231,7 +226,6 @@ listMode (x:xs) modulo right =  if mtest x modulo
       putStrLn (show x) 
       listMode xs modulo right
       putMVar right (v+1)
-      threadDelay 10000
     else do
       listMode xs modulo right
 
