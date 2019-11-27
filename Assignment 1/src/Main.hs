@@ -101,20 +101,20 @@ countMode :: [Int] -> Int -> Int
 countMode list modulo = length [x | x <- list, mtest x modulo]
 
 
--- countMVar :: Int ->  IO ()
--- countMVar treads lower upper = do
---   counter <- createEmptyMVar 
---   makeFork treads (countMode )
---   return ()
+countMVar :: Int -> [Int] -> Int -> IO ()
+countMVar threads list modulo = do
+  counter <- newMVar 0 
+  makeFork counter treads list modulo
+  return ()
 
-makeFork :: Int -> [Int] -> Int -> IO ()
-makeFork 0 _ _ = return ()
-makeFork 1 ints modulo  = do
+makeFork :: MVar -> Int -> [Int] -> Int -> IO ()
+makeFork c 0 _ _ = return ()
+makeFork c 1 ints modulo  = do
   forkIO $ putStrLn $ show (countMode1 ints modulo)
   return ()
-makeFork n ints modulo  = do
+makeFork c n ints modulo  = do
   forkIO $ putStrLn $ show(countMode (getListPart n ints) modulo)
-  makeFork (n-1) ints modulo
+  makeFork c (n-1) ints modulo
 
 getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
