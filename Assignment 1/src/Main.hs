@@ -35,7 +35,9 @@ main = do
       SyncMVar -> do countMVar (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> do countIORef (cfgThreads config) ints (cfgModulus config)
       
-    List  -> putStrLn "List"
+    List  -> case cfgSync config of
+      SyncMVar -> do putList (cfgThreads config) ints (cfgModulus config)
+      SyncIORef -> putStrLn "fakkedeezisnognietaf"
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
       | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
@@ -171,12 +173,13 @@ makeFork c n ints modulo  = do
     threadDelay 10000
   makeFork c (n-1) (ints \\ (getListPart n ints)) modulo
 
+
+--split list, get the first Nth part of the list  
 getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
 getListPart n list = take (floor (1 / (fromIntegral n) * (fromIntegral $ length list))) list
  
-
---Mtest bs
+--Mtest functions
 digs :: Int -> [Int]
 digs 0 = []
 digs x = digs (x `div` 10) ++ [x `mod` 10]
@@ -185,4 +188,49 @@ weights :: Int -> [Int]
 weights n = reverse [1..(length (digs n))]
 
 mtest :: Int -> Int -> Bool
-mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0 
+mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
+
+
+--mtest for every 1st thread
+countMode1 :: [Int] -> Int -> Int
+countMode1 l@(x:_)  = countMode [x..((last l)-1)]  
+
+--mtest for every Nth thread
+countMode :: [Int] -> Int -> Int
+countMode list modulo = length [x | x <- list, mtest x modulo]
+
+
+--listmode
+putList :: Int -> [Int] -> Int -> IO ()
+putList threads list modulo = do
+  makeFork' threads list modulo
+  threadDelay 1000
+  return ()
+
+makeFork' :: Int -> [Int] -> Int -> IO ()
+makeFork' 0 _ _ = return ()
+makeFork' 1 ints modulo  = do
+  _ <- forkIO $ do 
+    listMode1 ints modulo
+    threadDelay 10000
+  return ()
+makeFork' n ints modulo  = do
+  _ <- forkIO $ do
+    listMode (getListPart n ints) modulo
+    threadDelay 10000
+  makeFork' (n-1) (ints \\ (getListPart n ints)) modulo
+
+
+--mtest for every Nth thread
+listMode :: [Int] -> Int -> IO()
+listMode [] _ = return ()
+listMode (x:xs) modulo =  if mtest x modulo 
+    then do
+      putStrLn (show x) 
+      listMode xs modulo
+    else do
+      listMode xs modulo
+
+listMode1 :: [Int] -> Int -> IO()
+listMode1 l@(x:_)  = listMode [x..((last l)-1)] 
+                      
