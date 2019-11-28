@@ -38,9 +38,12 @@ main = do
     List  -> case cfgSync config of
       SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
-    Search expected
-      | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
-      | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
+    Search str -> case cfgSync config of
+      SyncMVar -> mVarSearch (cfgThreads config) ints (cfgModulus config) str
+      SyncIORef -> putStrLn "fakkadeezisnognietgeimplementeerd" 
+      --   expected
+      -- | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
+      -- | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
     _ -> return ()
 
   -- forkIO $ replicateM_ 100 (putChar 'A')
@@ -248,14 +251,18 @@ listModeIORef (x:xs) modulo lock counter = if mtest x modulo
       interlocked lock (writeActionListIORef x counter)
       listModeIORef xs modulo lock counter
     else do
-      listModeIORef xs modulo lock
+      listModeIORef xs modulo lock counter
 
-writeAction :: Int -> IO ()
-writeAction x = putStrLn $ " " ++ (show x)
+writeActionListIORef :: Int -> IORef Int-> IO ()
+writeActionListIORef x counter = do
+  oldCounter <- readIORef counter
+  let newCounter = oldCounter + 1
+  writeIORef counter newCounter
+  putStrLn $ (show newCounter) ++ " " ++ (show x)
 
-listMode1IORef :: [Int] -> Int -> IORef Lock-> IO()
-listMode1IORef [] _ _ = return ()
-listMode1IORef l@(x:_) modulo lock = listModeIORef [x..((last l)-1)] modulo lock
+listMode1IORef :: [Int] -> Int -> IORef Lock-> IORef Int -> IO()
+listMode1IORef [] _ _ _ = return ()
+listMode1IORef l@(x:_) modulo lock counter = listModeIORef [x..((last l)-1)] modulo lock counter
 
 --searchmode
 --searchmodeMvar
