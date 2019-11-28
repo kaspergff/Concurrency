@@ -1,7 +1,6 @@
 module Main where
 
 import Control.Concurrent
-import Control.Concurrent.Async
 import Control.Monad
 import System.Environment
 import System.IO
@@ -38,15 +37,13 @@ main = do
     List  -> case cfgSync config of
       SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
-    Search expected
-      | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
-      | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
+    Search str -> case cfgSync config of
+      SyncMVar -> mVarSearch (cfgThreads config) ints (cfgModulus config) str
+      SyncIORef -> putStrLn "fakkadeezisnognietgeimplementeerd" 
     _ -> return ()
 
-  -- forkIO $ replicateM_ 100 (putChar 'A')
-  -- forkIO $ replicateM_ 100 (putChar 'B')
 
-  threadDelay 100000
+  threadDelay 10000
 
 -- Parses the command line arguments
 parseConfig :: [String] -> Config
@@ -191,20 +188,19 @@ countMode list modulo = length [x | x <- list, mtest x modulo]
 iORefList :: Int -> [Int] -> Int -> IO ()
 iORefList threads list modulo = do
   lock <- newIORef Unlocked
-  counter <- newIORef 0
-  iORefListFork threads list modulo lock counter
+  iORefListFork threads list modulo lock
   return ()
 
-iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IORef Int -> IO ()
-iORefListFork 0 _ _ _ _= return ()
-iORefListFork 1 ints modulo lock counter = do
+iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IO ()
+iORefListFork 0 _ _ _ = return ()
+iORefListFork 1 ints modulo lock = do
   _ <- forkIO $ do 
-    listMode1IORef ints modulo lock counter
+    listMode1IORef ints modulo lock
   return ()
-iORefListFork n ints modulo lock counter = do
+iORefListFork n ints modulo lock  = do
   _ <- forkIO $ do
-    listModeIORef (getListPart n ints) modulo lock counter
-  iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock counter
+    listModeIORef (getListPart n ints) modulo lock
+  iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock
 
 --listmode
 mVarList :: Int -> [Int] -> Int -> IO ()
@@ -241,12 +237,12 @@ listMode1 [] _ _ = return ()
 listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
 
 
-listModeIORef :: [Int] -> Int -> IORef Lock -> IORef Int -> IO()
-listModeIORef [] _ _ _ = return ()
-listModeIORef (x:xs) modulo lock counter = if mtest x modulo 
+listModeIORef :: [Int] -> Int -> IORef Lock -> IO()
+listModeIORef [] _ _= return ()
+listModeIORef (x:xs) modulo lock = if mtest x modulo 
     then do
-      interlocked lock (writeActionListIORef x counter)
-      listModeIORef xs modulo lock counter
+      interlocked lock (writeAction x)
+      listModeIORef xs modulo lock
     else do
       listModeIORef xs modulo lock
 
