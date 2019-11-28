@@ -32,13 +32,11 @@ main = do
   
   case cfgMode config of
     Count -> case cfgSync config of
-      SyncMVar -> do countMVar (cfgThreads config) ints (cfgModulus config)
-      SyncIORef -> do countIORef (cfgThreads config) ints (cfgModulus config)
+      SyncMVar -> countMVar (cfgThreads config) ints (cfgModulus config)
+      SyncIORef -> countIORef (cfgThreads config) ints (cfgModulus config)
       
     List  -> case cfgSync config of
-      SyncMVar -> do 
-        foo <- async $ mVarList (cfgThreads config) ints (cfgModulus config)
-        wait foo
+      SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
     Search expected
       | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
@@ -173,13 +171,13 @@ getListPart n list = take (floor (1 / (fromIntegral n) * (fromIntegral $ length 
 --Mtest functions
 digits :: Int -> [Int]
 digits 0 = []
-digits x = digs (x `div` 10) ++ [x `mod` 10]
+digits x = digits (x `div` 10) ++ [x `mod` 10]
 
 weights :: Int -> [Int]
 weights n = reverse [1..(length (digits n))]
 
 mtest :: Int -> Int -> Bool
-mtest number m = mod (sum(zipWith (*) (digs number) (weights number))) m == 0
+mtest number m = mod (sum(zipWith (*) (digits number) (weights number))) m == 0
 
 --mtest for every 1st thread
 countMode1 :: [Int] -> Int -> Int
@@ -207,14 +205,11 @@ iORefListFork n ints modulo lock  = do
     interlocked lock (listModeIORef (getListPart n ints) modulo)
   iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock
 
-
-
 --listmode
 mVarList :: Int -> [Int] -> Int -> IO ()
 mVarList threads list modulo = do
   writelock <- newMVar 1
   mVarListFork threads list modulo writelock
-  return()
 
 mVarListFork :: Int -> [Int] -> Int -> MVar Int -> IO ()
 mVarListFork 0 _ _ _ = return ()
@@ -231,14 +226,12 @@ mVarListFork n ints modulo right  = do
 listMode :: [Int] -> Int -> MVar Int -> IO()
 listMode [] _ _ = return ()
 listMode (x:xs) modulo right =  if mtest x modulo 
-    then do
-     
+    then do     
       v <- takeMVar right
-      putStr ((show v) ++ "  ")
+      putStr ((show v) ++ " ")
       putStrLn (show x) 
-      listMode xs modulo right
       putMVar right (v+1)
-
+      listMode xs modulo right
     else do
       listMode xs modulo right
 
@@ -251,11 +244,13 @@ listModeIORef :: [Int] -> Int -> IO()
 listModeIORef [] _ = return ()
 listModeIORef (x:xs) modulo =  if mtest x modulo 
     then do
-      putStr "  "
-      putStrLn (show x) 
+      writeAction x
       listModeIORef xs modulo
     else do
       listModeIORef xs modulo
+
+writeAction :: Int -> IO ()
+writeAction x = putStrLn $ " " ++ (show x)
 
 listMode1IORef :: [Int] -> Int -> IO()
 listMode1IORef [] _  = return ()

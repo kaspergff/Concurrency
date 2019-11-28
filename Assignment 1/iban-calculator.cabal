@@ -25,8 +25,6 @@ executable iban-calculator
 
   other-modules:
       Paths_iban_calculator
-      Mvar.hs
-      Ioref.hs
 
   ghc-options:
       -Wall
