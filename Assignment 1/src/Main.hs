@@ -1,7 +1,6 @@
 module Main where
 
 import Control.Concurrent
-import Control.Concurrent.Async
 import Control.Monad
 import System.Environment
 import System.IO
@@ -38,15 +37,16 @@ main = do
     List  -> case cfgSync config of
       SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
-    Search expected
-      | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
-      | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
+    Search str -> case cfgSync config of
+      SyncMVar -> mVarSearch (cfgThreads config) ints (cfgModulus config) str
+      SyncIORef -> putStrLn "fakkadeezisnognietgeimplementeerd" 
+      --   expected
+     -- | checkHash expected 274856182 -> putStrLn "Given hash matches with account number 274856182."
+     -- | otherwise                    -> putStrLn "Hash does not match with account number 274856182."
     _ -> return ()
 
-  -- forkIO $ replicateM_ 100 (putChar 'A')
-  -- forkIO $ replicateM_ 100 (putChar 'B')
 
-  threadDelay 100000
+  threadDelay 10000
 
 -- Parses the command line arguments
 parseConfig :: [String] -> Config
@@ -255,4 +255,37 @@ writeAction x = putStrLn $ " " ++ (show x)
 listMode1IORef :: [Int] -> Int -> IORef Lock-> IO()
 listMode1IORef [] _ _ = return ()
 listMode1IORef l@(x:_) modulo lock = listModeIORef [x..((last l)-1)] modulo lock
-                      
+
+--searchmode
+--searchmodeMvar
+mVarSearch :: Int -> [Int] -> Int -> ByteString -> IO ()
+mVarSearch threads list modulo str = do
+  writelock <- newMVar 0
+  mVarSearchFork threads list modulo writelock str
+
+mVarSearchFork :: Int -> [Int] -> Int -> MVar Int -> ByteString -> IO ()
+mVarSearchFork 0 _ _ _ _ = return ()
+mVarSearchFork 1 ints modulo right str = do
+  _ <- forkIO $ do 
+    searchMode1 ints modulo right str
+  return ()
+mVarSearchFork n ints modulo right str = do
+  _ <- forkIO $ do
+    searchMode (getListPart n ints) modulo right str
+  mVarSearchFork (n-1) (ints \\ (getListPart n ints)) modulo right str
+
+searchMode :: [Int] -> Int -> MVar Int -> ByteString -> IO()
+searchMode [] _ _ _ = return ()
+searchMode (x:xs) modulo right str =  if mtest x modulo && checkHash str x
+    then do     
+      v <- takeMVar right
+      putStrLn (show x)
+    else do
+      searchMode xs modulo right str
+
+searchMode1 :: [Int] -> Int -> MVar Int -> ByteString -> IO()
+searchMode1 [] _ _ _ = return ()
+searchMode1 l@(x:_) modulo right str = searchMode [x..((last l)-1)] modulo right str                  
+
+--shatest :: Int -> ByteString -> Maybe Int
+--shatest i b = 
