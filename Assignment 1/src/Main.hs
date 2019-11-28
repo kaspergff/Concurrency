@@ -277,9 +277,11 @@ mVarSearchFork n ints modulo right str = do
 searchMode :: [Int] -> Int -> MVar Int -> ByteString -> IO()
 searchMode [] _ _ _ = return ()
 searchMode (x:xs) modulo right str =  if mtest x modulo && checkHash str x
+
     then do     
       v <- takeMVar right
-      putStrLn (show x)
+      putStrLn (show x) 
+    
     else do
       searchMode xs modulo right str
 
