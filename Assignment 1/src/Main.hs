@@ -34,7 +34,6 @@ main = do
     Count -> case cfgSync config of
       SyncMVar -> countMVar (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> countIORef (cfgThreads config) ints (cfgModulus config)
-      
     List  -> case cfgSync config of
       SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
@@ -221,7 +220,6 @@ mVarListFork n ints modulo right  = do
     listMode (getListPart n ints) modulo right
   mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right
 
---mtest for every Nth thread
 listMode :: [Int] -> Int -> MVar Int -> IO()
 listMode [] _ _ = return ()
 listMode (x:xs) modulo right =  if mtest x modulo 
@@ -237,7 +235,6 @@ listMode (x:xs) modulo right =  if mtest x modulo
 listMode1 :: [Int] -> Int -> MVar Int -> IO()
 listMode1 [] _ _ = return ()
 listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
-
 
 listModeIORef :: [Int] -> Int -> IORef Lock -> IORef Int-> IO()
 listModeIORef [] _ _ _ = return ()
@@ -291,7 +288,7 @@ searchMode [] _ count _ _ = do
 searchMode (x:xs) modulo right str mainThreadId =  if mtest x modulo && checkHash str x
     then do
       putStrLn (show x)
-      killThread mainThreadId     
+         
     else do
       searchMode xs modulo right str mainThreadId
 
