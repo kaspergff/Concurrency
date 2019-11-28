@@ -190,9 +190,7 @@ iORefList :: Int -> [Int] -> Int -> IO ()
 iORefList threads list modulo = do
   lock <- newIORef Unlocked
   counter <- newIORef 0
-  threadDelay 10000
   iORefListFork threads list modulo lock counter
-
 
 iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IORef Int-> IO ()
 iORefListFork 0 _ _ _ _ = return ()
@@ -262,36 +260,41 @@ listMode1IORef l@(x:_) modulo lock counter = listModeIORef [x..((last l)-1)] mod
 
 --searchmode
 --searchmodeMvar
+
+
 mVarSearch :: Int -> [Int] -> Int -> ByteString ->  IO ()
 mVarSearch threads list modulo str  = do
-  threadCount <- newMVar 0
+  threadCount <- newMVar []
   as <- async $ mVarSearchFork threads list modulo threadCount str 
   wa <- wait as
   putStrLn "not found"  
 
-mVarSearchFork :: Int -> [Int] -> Int -> MVar Int -> ByteString ->  IO ()
+mVarSearchFork :: Int -> [Int] -> Int -> MVar [ThreadId]-> ByteString ->  IO ()
 mVarSearchFork 0 _ _ _ _ = return ()
 mVarSearchFork 1 ints modulo right str  = do
-  _ <- forkIO $ do 
+  tid <- forkIO $ do 
     searchMode1 ints modulo right str 
+  list <- takeMVar right
+  putMVar right (list ++ [tid])
   return ()
 mVarSearchFork n ints modulo right str  = do
-  _ <- forkIO $ do
-    searchMode (getListPart n ints) modulo right str 
+  tid <- forkIO $ do
+    searchMode (getListPart n ints) modulo right str
+  list <- takeMVar right
+  putMVar right (list ++ [tid]) 
   mVarSearchFork (n-1) (ints \\ (getListPart n ints)) modulo right str 
 
-searchMode :: [Int] -> Int -> MVar Int -> ByteString ->  IO()
+searchMode :: [Int] -> Int -> MVar [ThreadId]-> ByteString ->  IO()
 -- [] means not found is this thread
-searchMode [] _ count _ = do
-  oldCount <- takeMVar count
-  putMVar count (oldCount+1)
+searchMode [] _ count _ = return ()
 searchMode (x:xs) modulo right str  =  if mtest x modulo && checkHash str x
     then do
       putStrLn (show x)
-      --killThread      
+      ids <- takeMVar right
+      mapM_ killThread ids     
     else do
       searchMode xs modulo right str 
 
-searchMode1 :: [Int] -> Int -> MVar Int -> ByteString ->  IO()
+searchMode1 :: [Int] -> Int -> MVar [ThreadId]-> ByteString ->  IO()
 searchMode1 [] _ _ _ = return ()
 searchMode1 l@(x:_) modulo right str = searchMode [x..((last l)-1)] modulo right str                   
