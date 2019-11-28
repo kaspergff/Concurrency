@@ -259,6 +259,7 @@ mVarSearch :: Int -> [Int] -> Int -> ByteString -> IO ()
 mVarSearch threads list modulo str = do
   writelock <- newMVar 0
   mVarSearchFork threads list modulo writelock str
+  
 
 mVarSearchFork :: Int -> [Int] -> Int -> MVar Int -> ByteString -> IO ()
 mVarSearchFork 0 _ _ _ _ = return ()
@@ -278,6 +279,7 @@ searchMode (x:xs) modulo right str =  if mtest x modulo && checkHash str x
     then do     
       v <- takeMVar right
       putStrLn (show x) 
+  
     
     else do
       searchMode xs modulo right str
