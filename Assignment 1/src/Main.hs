@@ -261,8 +261,9 @@ listMode1IORef l@(x:_) modulo lock counter = listModeIORef [x..((last l)-1)] mod
 --searchmodeMvar
 mVarSearch :: Int -> [Int] -> Int -> ByteString ->  IO ()
 mVarSearch threads list modulo str  = do
-  threadCount <- newMVar 0
-  as <- async $ mVarSearchFork threads list modulo threadCount str 
+  threadList <- newMVar []
+
+  as <- async $ mVarSearchFork threads list modulo threadList str 
   wa <- wait as
   putStrLn "not found"  
 
@@ -279,9 +280,7 @@ mVarSearchFork n ints modulo right str  = do
 
 searchMode :: [Int] -> Int -> MVar Int -> ByteString ->  IO()
 -- [] means not found is this thread
-searchMode [] _ count _ = do
-  oldCount <- takeMVar count
-  putMVar count (oldCount+1)
+searchMode [] _ count _ = return ()
 searchMode (x:xs) modulo right str  =  if mtest x modulo && checkHash str x
     then do
       putStrLn (show x)
