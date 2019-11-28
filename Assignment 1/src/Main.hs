@@ -287,5 +287,3 @@ searchMode1 :: [Int] -> Int -> MVar Int -> ByteString -> IO()
 searchMode1 [] _ _ _ = return ()
 searchMode1 l@(x:_) modulo right str = searchMode [x..((last l)-1)] modulo right str                  
 
---shatest :: Int -> ByteString -> Maybe Int
---shatest i b = 
