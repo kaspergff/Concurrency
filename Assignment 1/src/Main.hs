@@ -1,9 +1,11 @@
 module Main where
 
 import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Monad
 import System.Environment
 import System.IO
+import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import Data.ByteString.Char8           ( ByteString )
 import qualified Data.ByteString       as B
@@ -28,8 +30,6 @@ main = do
  -- putStrLn $ "on the numbers " ++ show (cfgLower config) ++ " .. " ++ show (cfgUpper config) ++ "."
 
   let ints = [(cfgLower config)..(cfgUpper config)]
-  
-  mainThreadID <- myThreadId
   case cfgMode config of
     Count -> case cfgSync config of
       SyncMVar -> countMVar (cfgThreads config) ints (cfgModulus config)
@@ -38,7 +38,7 @@ main = do
       SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
     Search str -> case cfgSync config of
-      SyncMVar -> mVarSearch (cfgThreads config) ints (cfgModulus config) str mainThreadID
+      SyncMVar -> mVarSearch (cfgThreads config) ints (cfgModulus config) str 
       SyncIORef -> putStrLn "fakkadeezisnognietgeimplementeerd" 
     _ -> return ()
     
@@ -91,8 +91,8 @@ checkHash expected value = expected == hash (B8.pack $ show value)
 
 data Lock = Unlocked | Locked deriving Eq
 type IOLock = IORef Lock
-
 -- Guard some action using the given lock
+
 
 interlocked :: IOLock -> IO a -> IO ()
 interlocked lock ac = do
@@ -189,8 +189,9 @@ iORefList :: Int -> [Int] -> Int -> IO ()
 iORefList threads list modulo = do
   lock <- newIORef Unlocked
   counter <- newIORef 0
+  threadDelay 10000
   iORefListFork threads list modulo lock counter
-  return ()
+
 
 iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IORef Int-> IO ()
 iORefListFork 0 _ _ _ _ = return ()
@@ -258,41 +259,36 @@ listMode1IORef l@(x:_) modulo lock counter = listModeIORef [x..((last l)-1)] mod
 
 --searchmode
 --searchmodeMvar
-mVarSearch :: Int -> [Int] -> Int -> ByteString -> ThreadId -> IO ()
-mVarSearch threads list modulo str mainThreadId = do
+mVarSearch :: Int -> [Int] -> Int -> ByteString ->  IO ()
+mVarSearch threads list modulo str  = do
   threadCount <- newMVar 0
-  mVarSearchFork threads list modulo threadCount str mainThreadId
-  threadDelay 10000 -- to do async
-  c <- takeMVar threadCount
-  if threads == c
-    then putStrLn "not found"
-    else return ()  
-  
+  as <- async $ mVarSearchFork threads list modulo threadCount str 
+  wa <- wait as
+  putStrLn "not found"  
 
-mVarSearchFork :: Int -> [Int] -> Int -> MVar Int -> ByteString -> ThreadId -> IO ()
-mVarSearchFork 0 _ _ _ _ _= return ()
-mVarSearchFork 1 ints modulo right str mainThreadId = do
+mVarSearchFork :: Int -> [Int] -> Int -> MVar Int -> ByteString ->  IO ()
+mVarSearchFork 0 _ _ _ _ = return ()
+mVarSearchFork 1 ints modulo right str  = do
   _ <- forkIO $ do 
-    searchMode1 ints modulo right str mainThreadId
+    searchMode1 ints modulo right str 
   return ()
-mVarSearchFork n ints modulo right str mainThreadId = do
+mVarSearchFork n ints modulo right str  = do
   _ <- forkIO $ do
-    searchMode (getListPart n ints) modulo right str mainThreadId
-  mVarSearchFork (n-1) (ints \\ (getListPart n ints)) modulo right str mainThreadId
+    searchMode (getListPart n ints) modulo right str 
+  mVarSearchFork (n-1) (ints \\ (getListPart n ints)) modulo right str 
 
-searchMode :: [Int] -> Int -> MVar Int -> ByteString -> ThreadId -> IO()
+searchMode :: [Int] -> Int -> MVar Int -> ByteString ->  IO()
 -- [] means not found is this thread
-searchMode [] _ count _ _ = do
+searchMode [] _ count _ = do
   oldCount <- takeMVar count
   putMVar count (oldCount+1)
-searchMode (x:xs) modulo right str mainThreadId =  if mtest x modulo && checkHash str x
+searchMode (x:xs) modulo right str  =  if mtest x modulo && checkHash str x
     then do
       putStrLn (show x)
          
     else do
-      searchMode xs modulo right str mainThreadId
+      searchMode xs modulo right str 
 
-searchMode1 :: [Int] -> Int -> MVar Int -> ByteString -> ThreadId -> IO()
-searchMode1 [] _ _ _ _= return ()
-searchMode1 l@(x:_) modulo right str mainThreadId= searchMode [x..((last l)-1)] modulo right str mainThreadId                  
-
+searchMode1 :: [Int] -> Int -> MVar Int -> ByteString ->  IO()
+searchMode1 [] _ _ _ = return ()
+searchMode1 l@(x:_) modulo right str = searchMode [x..((last l)-1)] modulo right str                   
