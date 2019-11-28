@@ -94,7 +94,6 @@ checkHash expected value = expected == hash (B8.pack $ show value)
 
 data Lock = Unlocked | Locked deriving Eq
 type IOLock = IORef Lock
-
 -- Guard some action using the given lock
 
 interlocked :: IOLock -> IO a -> IO ()
@@ -117,29 +116,30 @@ countIORef :: Int -> [Int] -> Int -> IO ()
 countIORef threads list modulo = do
   lock <- newIORef Unlocked
   counter <- newIORef 0 
-  makeForkIORefCount counter lock threads list modulo
-  threadDelay 1000
+  iORefForkCount counter lock threads list modulo
+  threadDelay 1000 -- needed -> try async???
   c <- readIORef counter
-  putStrLn (show c)
+  putStrLn (show c)  
 
-makeForkIORefCount :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
-makeForkIORefCount _  _ 0 _ _ = return ()
-makeForkIORefCount c lock 1 ints modulo  = do
+iORefForkCount :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
+iORefForkCount _  _ 0 _ _ = return ()
+iORefForkCount c lock 1 ints modulo  = do
   _ <- forkIO $ do
     let count = countMode1 ints modulo
     interlocked lock (iORefCountAction c count)
-  return ()
-makeForkIORefCount c lock n ints modulo = do
+  return () -- needed expression
+iORefForkCount c lock n ints modulo = do
   _ <- forkIO $ do
     let count = countMode (getListPart n ints) modulo
     interlocked lock (iORefCountAction c count)
-  makeForkIORefCount c lock (n-1) (ints \\ (getListPart n ints)) modulo
+  iORefForkCount c lock (n-1) (ints \\ (getListPart n ints)) modulo
 
 iORefCountAction :: Num a => IORef a -> a -> IO ()
 iORefCountAction c count = do 
   old <- readIORef c
   writeIORef c (old + count) 
-
+  
+-- Mvar
 countMVar :: Int -> [Int] -> Int -> IO ()
 countMVar threads list modulo = do
   counter <- newMVar 0 
@@ -192,21 +192,20 @@ iORefList :: Int -> [Int] -> Int -> IO ()
 iORefList threads list modulo = do
   lock <- newIORef Unlocked
   counter <- newIORef 0
-  iORefListFork threads list modulo lock counter
-  return ()
+  iORefForkList threads list modulo lock counter
 
-iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IORef Int -> IO ()
-iORefListFork 0 _ _ _ _= return ()
-iORefListFork 1 ints modulo lock counter = do
+iORefForkList :: Int -> [Int] -> Int -> IORef Lock -> IORef Int -> IO ()
+iORefForkList 0 _ _ _ _= return ()
+iORefForkList 1 ints modulo lock counter = do
   _ <- forkIO $ do 
     listMode1IORef ints modulo lock counter
   return ()
-iORefListFork n ints modulo lock counter = do
+iORefForkList n ints modulo lock counter = do
   _ <- forkIO $ do
     listModeIORef (getListPart n ints) modulo lock counter
-  iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock counter
+  iORefForkList (n-1) (ints \\ (getListPart n ints)) modulo lock counter
 
---listmode
+--listModeMVar
 mVarList :: Int -> [Int] -> Int -> IO ()
 mVarList threads list modulo = do
   writelock <- newMVar 1
@@ -214,31 +213,31 @@ mVarList threads list modulo = do
 
 mVarListFork :: Int -> [Int] -> Int -> MVar Int -> IO ()
 mVarListFork 0 _ _ _ = return ()
-mVarListFork 1 ints modulo right = do
+mVarListFork 1 ints modulo counter = do
   _ <- forkIO $ do 
-    listMode1 ints modulo right
+    listMode1MVar ints modulo counter
   return ()
-mVarListFork n ints modulo right  = do
+mVarListFork n ints modulo counter  = do
   _ <- forkIO $ do
-    listMode (getListPart n ints) modulo right
-  mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right
+    listModeMVar (getListPart n ints) modulo counter
+  mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo counter
 
 --mtest for every Nth thread
-listMode :: [Int] -> Int -> MVar Int -> IO()
-listMode [] _ _ = return ()
-listMode (x:xs) modulo right =  if mtest x modulo 
+listModeMVar :: [Int] -> Int -> MVar Int -> IO()
+listModeMVar [] _ _ = return ()
+listModeMVar (x:xs) modulo counter =  if mtest x modulo 
     then do     
-      v <- takeMVar right
+      v <- takeMVar counter
       putStr ((show v) ++ " ")
       putStrLn (show x) 
-      putMVar right (v+1)
-      listMode xs modulo right
+      putMVar counter (v+1)
+      listModeMVar xs modulo counter
     else do
-      listMode xs modulo right
+      listModeMVar xs modulo counter
 
-listMode1 :: [Int] -> Int -> MVar Int -> IO()
-listMode1 [] _ _ = return ()
-listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
+listMode1MVar :: [Int] -> Int -> MVar Int -> IO()
+listMode1MVar [] _ _ = return ()
+listMode1MVar l@(x:_) modulo counter = listModeMVar [x..((last l)-1)] modulo counter 
 
 
 listModeIORef :: [Int] -> Int -> IORef Lock -> IORef Int -> IO()
