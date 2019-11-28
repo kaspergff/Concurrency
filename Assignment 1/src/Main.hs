@@ -117,26 +117,26 @@ countIORef :: Int -> [Int] -> Int -> IO ()
 countIORef threads list modulo = do
   lock <- newIORef Unlocked
   counter <- newIORef 0 
-  makeForkIORef counter lock threads list modulo
+  makeForkIORefCount counter lock threads list modulo
   threadDelay 1000
   c <- readIORef counter
   putStrLn (show c)
 
-makeForkIORef :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
-makeForkIORef _  _ 0 _ _ = return ()
-makeForkIORef c lock 1 ints modulo  = do
+makeForkIORefCount :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
+makeForkIORefCount _  _ 0 _ _ = return ()
+makeForkIORefCount c lock 1 ints modulo  = do
   _ <- forkIO $ do
     let count = countMode1 ints modulo
-    interlocked lock (action c count)
+    interlocked lock (iORefCountAction c count)
   return ()
-makeForkIORef c lock n ints modulo = do
+makeForkIORefCount c lock n ints modulo = do
   _ <- forkIO $ do
     let count = countMode (getListPart n ints) modulo
-    interlocked lock (action c count)
-  makeForkIORef c lock (n-1) (ints \\ (getListPart n ints)) modulo
+    interlocked lock (iORefCountAction c count)
+  makeForkIORefCount c lock (n-1) (ints \\ (getListPart n ints)) modulo
 
-action :: Num a => IORef a -> a -> IO ()
-action c count = do 
+iORefCountAction :: Num a => IORef a -> a -> IO ()
+iORefCountAction c count = do 
   old <- readIORef c
   writeIORef c (old + count) 
 
@@ -198,11 +198,11 @@ iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IO ()
 iORefListFork 0 _ _ _ = return ()
 iORefListFork 1 ints modulo lock = do
   _ <- forkIO $ do 
-    interlocked lock (listMode1IORef ints modulo)
+    listMode1IORef ints modulo lock
   return ()
 iORefListFork n ints modulo lock  = do
   _ <- forkIO $ do
-    interlocked lock (listModeIORef (getListPart n ints) modulo)
+    listModeIORef (getListPart n ints) modulo lock
   iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock
 
 --listmode
@@ -240,19 +240,19 @@ listMode1 [] _ _ = return ()
 listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
 
 
-listModeIORef :: [Int] -> Int -> IO()
-listModeIORef [] _ = return ()
-listModeIORef (x:xs) modulo =  if mtest x modulo 
+listModeIORef :: [Int] -> Int -> IORef Lock -> IO()
+listModeIORef [] _ _= return ()
+listModeIORef (x:xs) modulo lock = if mtest x modulo 
     then do
-      writeAction x
-      listModeIORef xs modulo
+      interlocked lock (writeAction x)
+      listModeIORef xs modulo lock
     else do
-      listModeIORef xs modulo
+      listModeIORef xs modulo lock
 
 writeAction :: Int -> IO ()
 writeAction x = putStrLn $ " " ++ (show x)
 
-listMode1IORef :: [Int] -> Int -> IO()
-listMode1IORef [] _  = return ()
-listMode1IORef l@(x:_) modulo = listModeIORef [x..((last l)-1)] modulo 
+listMode1IORef :: [Int] -> Int -> IORef Lock-> IO()
+listMode1IORef [] _ _ = return ()
+listMode1IORef l@(x:_) modulo lock = listModeIORef [x..((last l)-1)] modulo lock
                       
