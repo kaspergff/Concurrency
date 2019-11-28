@@ -270,7 +270,6 @@ mVarSearch threads list modulo str = do
     then putStrLn "not found"
     else return ()
   
-  
 
 mVarSearchFork :: Int -> [Int] -> Int -> MVar Int -> ByteString -> IO ()
 mVarSearchFork 0 _ _ _ _ = return ()
