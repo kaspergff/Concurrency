@@ -13,8 +13,6 @@ import Data.Word
 import Data.List (elemIndex, (\\) )
 import Data.Maybe (fromMaybe)
 import Crypto.Hash.SHA1
---import Ioref
---import Mvar
 
 
 main :: IO ()
@@ -31,8 +29,8 @@ main = do
   let ints = [(cfgLower config)..(cfgUpper config)]
   case cfgMode config of
     Count -> case cfgSync config of
-      SyncMVar -> countMVar (cfgThreads config) ints (cfgModulus config)
-      SyncIORef -> countIORef (cfgThreads config) ints (cfgModulus config)
+      SyncMVar -> mVarCount (cfgThreads config) ints (cfgModulus config)
+      SyncIORef -> iORefCount (cfgThreads config) ints (cfgModulus config)
     List  -> case cfgSync config of
       SyncMVar -> mVarList (cfgThreads config) ints (cfgModulus config)
       SyncIORef -> iORefList (cfgThreads config) ints (cfgModulus config)
@@ -90,75 +88,15 @@ checkHash expected value = expected == hash (B8.pack $ show value)
 
 data Lock = Unlocked | Locked deriving Eq
 type IOLock = IORef Lock
--- Guard some action using the given lock
 
 
-interlocked :: IOLock -> IO a -> IO ()
-interlocked lock ac = do
-  access <- atomCAS lock Unlocked Locked
-  if access
-    then do
-      _ <- ac
-      atomicModifyIORef' lock (\_ -> (Unlocked, ())) 
-  else
-    interlocked lock ac
 
-atomCAS :: Eq a => IORef a -> a -> a -> IO Bool
-atomCAS ptr old new =
-    atomicModifyIORef' ptr (\ cur -> if cur == old
-                                    then (new, True)
-                                    else (cur, False))
-
-countIORef :: Int -> [Int] -> Int -> IO ()
-countIORef threads list modulo = do
-  lock <- newIORef Unlocked
-  counter <- newIORef 0 
-  makeForkIORefCount counter lock threads list modulo
-  threadDelay 1000
-  c <- readIORef counter
-  putStrLn (show c)
-
-makeForkIORefCount :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
-makeForkIORefCount _  _ 0 _ _ = return ()
-makeForkIORefCount c lock 1 ints modulo  = do
-  _ <- forkIO $ do
-    let count = countMode1 ints modulo
-    interlocked lock (iORefCountAction c count)
-  return ()
-makeForkIORefCount c lock n ints modulo = do
-  _ <- forkIO $ do
-    let count = countMode (getListPart n ints) modulo
-    interlocked lock (iORefCountAction c count)
-  makeForkIORefCount c lock (n-1) (ints \\ (getListPart n ints)) modulo
-
-iORefCountAction :: Num a => IORef a -> a -> IO ()
-iORefCountAction c count = do 
-  old <- readIORef c
-  writeIORef c (old + count) 
-
-countMVar :: Int -> [Int] -> Int -> IO ()
-countMVar threads list modulo = do
-  counter <- newMVar 0 
-  makeForkMVar counter threads list modulo
-  threadDelay 1000
-  c <- takeMVar counter
-  putStrLn (show c)
-
-makeForkMVar :: MVar Int -> Int -> [Int] -> Int -> IO ()
-makeForkMVar _ 0 _ _ = return ()
-makeForkMVar c 1 ints modulo  = do
-  _ <- forkIO $ do 
-    let count = countMode1 ints modulo
-    old <- takeMVar c
-    putMVar c (old + count)
-  return ()
-makeForkMVar c n ints modulo  = do
-  _ <- forkIO $ do
-    let count = countMode (getListPart n ints) modulo
-    old <- takeMVar c
-    putMVar c (old + count)
-  makeForkMVar c (n-1) (ints \\ (getListPart n ints)) modulo
-
+--
+--
+--
+--General functions that are both used by Ioref and Mvar
+--
+--
 --split list, get the first Nth part of the list  
 getListPart :: Int -> [Int] -> [Int]
 getListPart 1 list = list
@@ -175,22 +113,77 @@ weights n = reverse [1..(length (digits n))]
 mtest :: Int -> Int -> Bool
 mtest number m = mod (sum(zipWith (*) (digits number) (weights number))) m == 0
 
---mtest for every 1st thread
+--mtest for every 1st thread in count mode
 countMode1 :: [Int] -> Int -> Int
 countMode1 [] _= 0
 countMode1 l@(x:_) modulo = countMode [x..((last l)-1)] modulo  
 
---mtest for every Nth thread
+--mtest for every Nth thread in countmode
 countMode :: [Int] -> Int -> Int
+countMode [] _ = 0
 countMode list modulo = length [x | x <- list, mtest x modulo]
 
+
+
+--
+--
+--
+-- Ioref functions
+--
+--
+-- Locks
+-- Guard some action using the given lock
+interlocked :: IOLock -> IO a -> IO ()
+interlocked lock ac = do
+  access <- atomCAS lock Unlocked Locked
+  if access
+    then do
+      _ <- ac
+      atomicModifyIORef' lock (\_ -> (Unlocked, ())) 
+  else
+    interlocked lock ac
+
+atomCAS :: Eq a => IORef a -> a -> a -> IO Bool
+atomCAS ptr old new =
+    atomicModifyIORef' ptr (\ cur -> if cur == old
+                                    then (new, True)
+                                    else (cur, False))
+
+--countmode
+iORefCount :: Int -> [Int] -> Int -> IO ()
+iORefCount threads list modulo = do
+  lock <- newIORef Unlocked
+  counter <- newIORef 0 
+  iORefmakeForkCount counter lock threads list modulo
+  threadDelay 1000
+  c <- readIORef counter
+  putStrLn (show c)
+
+iORefmakeForkCount :: IORef Int -> IORef Lock -> Int -> [Int] -> Int -> IO ()
+iORefmakeForkCount _  _ 0 _ _ = return ()
+iORefmakeForkCount c lock 1 ints modulo  = do
+  _ <- forkIO $ do
+    let count = countMode1 ints modulo
+    interlocked lock (iORefCountAction c count)
+  return ()
+iORefmakeForkCount c lock n ints modulo = do
+  _ <- forkIO $ do
+    let count = countMode (getListPart n ints) modulo
+    interlocked lock (iORefCountAction c count)
+  iORefmakeForkCount c lock (n-1) (ints \\ (getListPart n ints)) modulo
+
+iORefCountAction :: Num a => IORef a -> a -> IO ()
+iORefCountAction c count = do 
+  old <- readIORef c
+  writeIORef c (old + count) 
+
+--listmode
 iORefList :: Int -> [Int] -> Int -> IO ()
 iORefList threads list modulo = do
   lock <- newIORef Unlocked
   counter <- newIORef 0
   threadDelay 10000
   iORefListFork threads list modulo lock counter
-
 
 iORefListFork :: Int -> [Int] -> Int -> IORef Lock -> IORef Int-> IO ()
 iORefListFork 0 _ _ _ _ = return ()
@@ -203,39 +196,6 @@ iORefListFork n ints modulo lock counter = do
     listModeIORef (getListPart n ints) modulo lock counter
   iORefListFork (n-1) (ints \\ (getListPart n ints)) modulo lock counter
 
---listmode
-mVarList :: Int -> [Int] -> Int -> IO ()
-mVarList threads list modulo = do
-  writelock <- newMVar 1
-  mVarListFork threads list modulo writelock
-
-mVarListFork :: Int -> [Int] -> Int -> MVar Int -> IO ()
-mVarListFork 0 _ _ _ = return ()
-mVarListFork 1 ints modulo right = do
-  _ <- forkIO $ do 
-    listMode1 ints modulo right
-  return ()
-mVarListFork n ints modulo right  = do
-  _ <- forkIO $ do
-    listMode (getListPart n ints) modulo right
-  mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right
-
-listMode :: [Int] -> Int -> MVar Int -> IO()
-listMode [] _ _ = return ()
-listMode (x:xs) modulo right =  if mtest x modulo 
-    then do     
-      v <- takeMVar right
-      putStr ((show v) ++ " ")
-      putStrLn (show x) 
-      putMVar right (v+1)
-      listMode xs modulo right
-    else do
-      listMode xs modulo right
-
-listMode1 :: [Int] -> Int -> MVar Int -> IO()
-listMode1 [] _ _ = return ()
-listMode1 l@(x:_) modulo right = listMode [x..((last l)-1)] modulo right 
-
 listModeIORef :: [Int] -> Int -> IORef Lock -> IORef Int-> IO()
 listModeIORef [] _ _ _ = return ()
 listModeIORef (x:xs) modulo lock counter = if mtest x modulo 
@@ -244,66 +204,187 @@ listModeIORef (x:xs) modulo lock counter = if mtest x modulo
       listModeIORef xs modulo lock counter
     else do
       listModeIORef xs modulo lock counter
-
+  
 writeActionListIORef :: Int -> IORef Int-> IO ()
 writeActionListIORef x counter = do
   oldCounter <- readIORef counter
   let newCounter = oldCounter + 1
   writeIORef counter newCounter
   putStrLn $ (show newCounter) ++ " " ++ (show x)
-
+  
 listMode1IORef :: [Int] -> Int -> IORef Lock-> IORef Int -> IO()
 listMode1IORef [] _ _ _ = return ()
 listMode1IORef l@(x:_) modulo lock counter = listModeIORef [x..((last l)-1)] modulo lock counter
 
---searchmode
---searchmodeMvar
-mVarSearch :: Int -> [Int] -> Int -> ByteString ->  IO ()
-mVarSearch threads list modulo str  = do
-  threadList <- newMVar [] -- list to killthreads if number is found
-  threadCounter <- newMVar 0
-  mVarSearchFork threads list modulo threadList str threadCounter
-  --threadDelay 1000000
-  a <- takeMVar threadCounter
-  --putStrLn $ "|" ++ (show a)++ "|"
-  when (a == threads) (putStrLn "not found")
-    
-
-mVarSearchFork :: Int -> [Int] -> Int -> MVar [ThreadId]-> ByteString -> MVar Int -> IO ()
-mVarSearchFork 0 _ _ _ _ _= return ()
-mVarSearchFork 1 ints modulo right str counter= do
-  tid <- forkIO $ do 
-    searchMode1 ints modulo right str counter
-    threadDelay 1000
-  list <- takeMVar right
-  putMVar right (list ++ [tid])
-  return ()
-mVarSearchFork n ints modulo right str counter = do
-  tid <- forkIO $ do
-    searchMode (getListPart n ints) modulo right str counter
-    threadDelay 1000
-  list <- takeMVar right
-  putMVar right (list ++ [tid]) 
-  mVarSearchFork (n-1) (ints \\ (getListPart n ints)) modulo right str counter
-
-searchMode :: [Int] -> Int -> MVar [ThreadId]-> ByteString ->  MVar Int -> IO()
--- [] means not found is this thread
-searchMode [] _ count _ counter = do
-  old <- takeMVar counter
-  putMVar counter (old + 1)
-searchMode (x:xs) modulo right str counter =  if mtest x modulo && checkHash str x
+pollingI :: IORef Int -> Int -> String ->IO ()  
+pollingI counter threads s = do
+  c <- readIORef counter
+  if (c == threads && c > -1) 
     then do
-      putStrLn (show x)
-      ids <- takeMVar right
-      mapM_ killThread ids     
-      return()
+      putStr s
+    else if c > -1 
+      then do 
+      putStrLn $ show c
+      threadDelay 100
+      pollingI counter threads s
+      else 
+        return()
+
+
+--
+--
+-- Mvar functions
+--
+--
+--
+
+--countmode
+mVarCount :: Int -> [Int] -> Int -> IO ()
+mVarCount threads list modulo = do
+  counter <- newMVar 0 
+  nmrofthreads <- newMVar 0
+  mVarmakeForkCount counter nmrofthreads threads list modulo
+  polling nmrofthreads threads counter
+ 
+  
+
+mVarmakeForkCount :: MVar Int -> MVar Int -> Int -> [Int] -> Int -> IO ()
+mVarmakeForkCount _ _ 0 _ _ = return ()
+mVarmakeForkCount c nmrofthreads 1 ints modulo  = do
+  _ <- forkIO $ do 
+    let count = countMode1 ints modulo
+    old <- takeMVar c
+    putMVar c (old + count)
+    nmr <- takeMVar nmrofthreads
+    putMVar nmrofthreads (nmr+1)
+  return ()
+mVarmakeForkCount c nmrofthreads n ints modulo  = do
+  _ <- forkIO $ do
+    let count = countMode (getListPart n ints) modulo
+    old <- takeMVar c
+    putMVar c (old + count)
+    nmr <- takeMVar nmrofthreads
+    putMVar nmrofthreads (nmr+1)
+  mVarmakeForkCount c nmrofthreads (n-1) (ints \\ (getListPart n ints)) modulo
+
+--listmode
+mVarList :: Int -> [Int] -> Int -> IO ()
+mVarList threads list modulo = do
+  writelock <- newMVar 1
+  actievethreads <- newMVar 0 
+  mVarListFork threads list modulo writelock actievethreads
+  polling1 actievethreads threads
+
+mVarListFork :: Int -> [Int] -> Int -> MVar Int -> MVar Int -> IO ()
+mVarListFork 0 _ _ _ _ = return ()
+mVarListFork 1 ints modulo right nmrofthreads = do
+  _ <- forkIO $ do 
+    listModeMVar1 ints modulo right
+    nmr <- takeMVar nmrofthreads
+    putMVar nmrofthreads (nmr+1)
+  return ()
+mVarListFork n ints modulo right nmrofthreads = do
+  _ <- forkIO $ do
+    listModeMVar (getListPart n ints) modulo right
+    nmr <- takeMVar nmrofthreads
+    putMVar nmrofthreads (nmr+1)
+  mVarListFork (n-1) (ints \\ (getListPart n ints)) modulo right nmrofthreads
+ 
+
+listModeMVar :: [Int] -> Int -> MVar Int -> IO()
+listModeMVar [] _ _ = return ()
+listModeMVar (x:xs) modulo right =  if mtest x modulo 
+    then do     
+      v <- takeMVar right
+      putStr ((show v) ++ " ")
+      putStrLn (show x) 
+      putMVar right (v+1)
+      listModeMVar xs modulo right
     else do
-      searchMode xs modulo right str counter
+      listModeMVar xs modulo right
 
+listModeMVar1 :: [Int] -> Int -> MVar Int -> IO()
+listModeMVar1 [] _ _ = return ()
+listModeMVar1 l@(x:_) modulo right = listModeMVar [x..((last l)-1)] modulo right 
 
-searchMode1 :: [Int] -> Int -> MVar [ThreadId]-> ByteString ->MVar Int -> IO()
-searchMode1 [] _ _ _ _= return ()
-searchMode1 l@(x:_) modulo right str counter= searchMode [x..((last l)-1)] modulo right str counter                  
+--searchmode
+--the functions below might look a bit odd but that is due to the fact that an async thread has a certain procedure in order to be cancelled (async cannot be killed when it enters a wait functions)
+mVarSearch :: Int -> [Int] -> Int -> ByteString -> IO ()
+mVarSearch threads list modulo str  = do
+  threadList <- newMVar [] -- list to threads to be killed if number is found
+  extraList <- newMVar [] -- list of threads that is finished
+  mVarSearchFork threads list modulo threadList extraList str 
+  a <- readMVar extraList--this is looked at when all threads are complete
+  if (length a) == threads then -- if the length of the list that contains all the finished treads is the same as the amount of started threads than the number is not found so.....that is printed
+    putStrLn "not found"
+  else return ()
+ 
 
+mVarSearchFork :: Int -> [Int] -> Int -> MVar [Async ()]-> MVar [Async ()]-> ByteString -> IO ()
+mVarSearchFork 0 _ _ _ _ _ =  return ()
+mVarSearchFork 1 ints modulo right tlist str  = makeMvarSearchFork searchMode1 ints 1 ints modulo right tlist str
+mVarSearchFork n ints modulo right tlist str  = makeMvarSearchFork searchMode (getListPart n ints) n ints modulo right tlist str
+    
+--makeMvarSearchFork :: (a->b) -> [Int] -> Int -> [Int] -> Int -> MVar [Async ()]-> MVar [Async ()]-> ByteString -> IO ()
+makeMvarSearchFork f1 f2 n ints modulo right tlist str = do
+  aid <- async $ do
+    f1 f2 modulo right tlist str 
+  list <- takeMVar right
+  putMVar right (list ++ [aid]) 
+  list3 <- takeMVar tlist
+  putMVar tlist (list3 ++ [ aid]) 
+  mVarSearchFork (n-1) (ints \\ (getListPart n ints)) modulo right tlist str 
+  list1 <- readMVar right
+  when (aid `elem` list1) ( do
+    list2 <-takeMVar right
+    putMVar right (list2 \\ [aid])
+    --before the wait an async does not like to be killed, it threw an error because of it so this way it is errorless.
+    wait aid
+    return ())
 
+searchMode :: [Int] -> Int -> MVar [Async ()]-> MVar [Async ()] -> ByteString -> IO()
+-- [] means not found is this thread
+searchMode [] _ _ _ _  = return ()
+searchMode (x:xs) modulo right tlist str =  if mtest x modulo && checkHash str x
+    then do
+      ids <- takeMVar right --get all threads that need to be killed
+      _ <- takeMVar tlist -- make sure that "not found" cannot be printed
+      putStrLn (show x) -- show the found number
+      putMVar tlist [] -- make sure that "not found" can never be printed beyond this point
+      putMVar right [] -- empty the active processes list
+      mapM_ cancel  (ids) -- cancel the processes that where active at the time the number was found
+      return ()
+      else do
+      -- if the answer was not in the list so far, continue to search through the list.
+      searchMode xs modulo right tlist str
 
+searchMode1 :: [Int] -> Int -> MVar [Async ()]-> MVar [Async ()]-> ByteString -> IO()
+searchMode1 [] _ _ _ _  = return ()
+searchMode1 l@(x:_) modulo right tlist str  = searchMode [x..((last l)-1)] modulo right tlist str                 
+
+polling :: MVar Int -> Int -> MVar Int ->IO ()  
+polling counter threads s = do
+  c <- readMVar counter
+  a <- readMVar s
+  if (c == threads && c > -1) 
+    then do
+      putStr (show a)
+    else if (c > -1) 
+      then do 
+      threadDelay 1000
+      polling counter threads s
+      else 
+        return()
+
+polling1 :: MVar Int -> Int ->IO ()  
+polling1 counter threads = do
+  c <- readMVar counter
+  if (c == threads && c > -1) 
+    then do
+      return ()
+    else if (c > -1) 
+      then do 
+      threadDelay 1000
+      polling1 counter threads 
+      else 
+        return()
