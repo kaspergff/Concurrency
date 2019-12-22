@@ -30,8 +30,11 @@ main = do
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
 
-  -- First stap Initialisation (Geen idee of dit persee in een apparte thread moet)
+  -- Part 1 Initialisation (Geen idee of dit persee in een apparte thread moet)
   _ <- forkIO $ initialisation me neighbours
+
+  -- -- Part 2 input
+  _ <- forkIO $ inputHandler
 
   threadDelay 1000000000
 
@@ -97,3 +100,26 @@ makeConnnection me neighbour = do
   putStrLn "I sent a message to the neighbour"
   message <- hGetLine chandle
   putStrLn $ "Neighbour send a message back: " ++ show message
+
+
+-- -- funtion to handle input 
+inputHandler :: IO ()
+inputHandler = do
+  com <- getLine
+  case (com) of
+    ("R") -> do 
+      putStrLn $ "Command R"
+      inputHandler
+    ("B") -> do 
+      putStrLn $ "Command B"
+      inputHandler
+    ("C") -> do 
+      putStrLn $ "Command C"
+      inputHandler
+    ("D") -> do 
+      putStrLn $ "Command D"
+      inputHandler
+    (_) -> do
+      putStrLn $ "wrong input"
+      inputHandler
+
