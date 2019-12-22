@@ -30,24 +30,8 @@ main = do
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
 
-  -- As an example, connect to the first neighbour. This just
-  -- serves as an example on using the network functions in Haskell
-  case neighbours of
-    [] -> putStrLn "I have no neighbours :("
-    neighbour : _ -> do
-      putStrLn $ "Connecting to neighbour " ++ show neighbour ++ "..."
-      client <- connectSocket neighbour
-      chandle <- socketToHandle client ReadWriteMode
-      -- Send a message over the socket
-      -- You can send and receive messages with a similar API as reading and writing to the console.
-      -- Use `hPutStrLn chandle` instead of `putStrLn`,
-      -- and `hGetLine  chandle` instead of `getLine`.
-      -- You can close a connection with `hClose chandle`.
-      hPutStrLn chandle $ "Hi process " ++ show neighbour ++ "! I'm process " ++ show me ++ " and you are my first neighbour."
-      putStrLn "I sent a message to the neighbour"
-      message <- hGetLine chandle
-      putStrLn $ "Neighbour send a message back: " ++ show message
-      hClose chandle
+  -- First stap Initialisation (Geen idee of dit persee in een apparte thread moet)
+  _ <- forkIO $ initialisation me neighbours
 
   threadDelay 1000000000
 
@@ -87,3 +71,25 @@ handleConnection connection = do
   message <- hGetLine chandle
   putStrLn $ "Incomming connection send a message: " ++ message
   hClose chandle
+
+
+  -------------------- End Template---------------------
+-- This function sets up the network en tries to connect to al the neighbours
+initialisation :: Int -> [Int] -> IO ()
+initialisation _ []              = do putStrLn "I have no more neighbours :("
+initialisation me (neighbour:xs) = do
+  putStrLn $ "Connecting to neighbour " ++ show neighbour ++ "..."
+  client <- connectSocket neighbour
+  chandle <- socketToHandle client ReadWriteMode
+  -- Send a message over the socket
+  -- You can send and receive messages with a similar API as reading and writing to the console.
+  -- Use `hPutStrLn chandle` instead of `putStrLn`,
+  -- and `hGetLine  chandle` instead of `getLine`.
+  -- You can close a connection with `hClose chandle`.
+  hPutStrLn chandle $ "Hi process " ++ show neighbour ++ "! I'm process " ++ show me ++ " and you are my first neighbour."
+  putStrLn "I sent a message to the neighbour"
+  message <- hGetLine chandle
+  putStrLn $ "Neighbour send a message back: " ++ show message
+  initialisation me xs
+
+
