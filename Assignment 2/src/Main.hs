@@ -78,6 +78,13 @@ handleConnection connection = do
 initialisation :: Int -> [Int] -> IO ()
 initialisation _ []              = do putStrLn "I have no more neighbours :("
 initialisation me (neighbour:xs) = do
+  makeConnnection me neighbour
+  initialisation me xs
+
+
+-- function to make a connection between two nodes  
+makeConnnection :: Int -> Int -> IO ()
+makeConnnection me neighbour = do 
   putStrLn $ "Connecting to neighbour " ++ show neighbour ++ "..."
   client <- connectSocket neighbour
   chandle <- socketToHandle client ReadWriteMode
@@ -86,10 +93,7 @@ initialisation me (neighbour:xs) = do
   -- Use `hPutStrLn chandle` instead of `putStrLn`,
   -- and `hGetLine  chandle` instead of `getLine`.
   -- You can close a connection with `hClose chandle`.
-  hPutStrLn chandle $ "Hi process " ++ show neighbour ++ "! I'm process " ++ show me ++ " and you are my first neighbour."
+  hPutStrLn chandle $ "Hi process " ++ show neighbour ++ "! I'm process " ++ show me ++ " and you are my neighbour."
   putStrLn "I sent a message to the neighbour"
   message <- hGetLine chandle
   putStrLn $ "Neighbour send a message back: " ++ show message
-  initialisation me xs
-
-
