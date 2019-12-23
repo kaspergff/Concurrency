@@ -4,11 +4,25 @@ module Main where
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Concurrent.STM.TMVar
 import Control.Exception
 import Data.IORef
 import System.Environment
 import System.IO
 import Network.Socket
+
+--datatypes
+--vanaf nu is een node gwn lekker een node
+type Node = Int  
+--we moeten die tabel gaan zien als een reachability graph
+--vanaf nu zijn de connecties gwn lekker een eigen type
+data Connection = Connection Node Int Node deriving (Show)
+--tabel is een lijst van connecties
+type Table = [Connection]
+
+
+
+
 
 main :: IO ()
 main = do
@@ -29,26 +43,25 @@ main = do
   listen serverSocket 1024
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
-
+  tabel <- newEmptyTMVarIO 
   -- Part 1 Initialisation (Geen idee of dit persee in een apparte thread moet)
-  _ <- forkIO $ initialisation me neighbours
-
+  _ <- forkIO $ initialisation me neighbours tabel
   -- -- Part 2 input
-  _ <- forkIO $ inputHandler
+  _ <- forkIO $ inputHandler tabel
 
   threadDelay 1000000000
 
-readCommandLineArguments :: IO (Int, [Int])
+readCommandLineArguments :: IO (Node, [Node])
 readCommandLineArguments = do
   args <- getArgs
   case args of
     [] -> error "Not enough arguments. You should pass the port number of the current process and a list of neighbours"
     (me:neighbours) -> return (read me, map read neighbours)
 
-portToAddress :: Int -> SockAddr
+portToAddress :: Node -> SockAddr
 portToAddress portNumber = SockAddrInet (fromIntegral portNumber) (tupleToHostAddress (127, 0, 0, 1)) -- localhost
 
-connectSocket :: Int -> IO Socket
+connectSocket :: Node -> IO Socket
 connectSocket portNumber = connect'
   where
     connect' = do
@@ -78,16 +91,30 @@ handleConnection connection = do
 
   -------------------- End Template---------------------
 -- This function sets up the network en tries to connect to al the neighbours
-initialisation :: Int -> [Int] -> IO ()
-initialisation _ []              = do putStrLn "I have no more neighbours :("
-initialisation me (neighbour:xs) = do
-  makeConnnection me neighbour
-  initialisation me xs
+initialisation :: Node -> [Node] -> (TMVar [Connection]) -> IO ()
+initialisation _ [] _             = do putStrLn "I have no more neighbours :("
+initialisation me (neighbour:xs) tabel = do
+  makeConnnection me neighbour tabel
+  initialisation me xs tabel
 
+--hier moeten we dus nog voor zorgen dat er nog een distance berekend word en word meegegeven maar das voor later zorg
+addtotable :: (TMVar [Connection]) -> Node -> STM ()
+addtotable tabel neighbour= do 
+  lijst <- takeTMVar tabel
+  putTMVar tabel (lijst ++  [(Connection neighbour 1 neighbour)]) 
+
+-- function to write a messsage from node a to b (kunnen we straks mooi gebruiken voor een astractie van de fail en repair messaged ed)
+-- string is voor nu het datatype maar kan mis beter een tuple worden van typebericht en bericht of we kunnen een datatype bericht maken dat
+-- Fail| repair | message is
+-- sendmessage :: Int -> Int -> String -> IO ()
+-- sendmessage from to message = do 
+--   client <- connectSocket to
+--   chandle <- socketToHandle client ReadWriteMode
+--   hPutStrLn chandle $ "Hi process " ++ show to ++ "! I'm process " ++ show from ++ " and i wanted to say" ++ show message
 
 -- function to make a connection between two nodes  
-makeConnnection :: Int -> Int -> IO ()
-makeConnnection me neighbour = do 
+makeConnnection :: Node -> Node -> (TMVar [Connection]) -> IO ()
+makeConnnection me neighbour tabel = do 
   putStrLn $ "Connecting to neighbour " ++ show neighbour ++ "..."
   client <- connectSocket neighbour
   chandle <- socketToHandle client ReadWriteMode
@@ -100,26 +127,33 @@ makeConnnection me neighbour = do
   putStrLn "I sent a message to the neighbour"
   message <- hGetLine chandle
   putStrLn $ "Neighbour send a message back: " ++ show message
+  atomically $ addtotable tabel neighbour
 
 
--- -- funtion to handle input 
-inputHandler :: IO ()
-inputHandler = do
+-- funtion to handle input
+-- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
+inputHandler :: (TMVar [Connection]) -> IO ()
+inputHandler tabel = do
   com <- getLine
   case (com) of
     ("R") -> do 
+      -- sendmessage 1102 1100 "sterf"
       putStrLn $ "Command R"
-      inputHandler
+      inputHandler tabel
     ("B") -> do 
       putStrLn $ "Command B"
-      inputHandler
+      printtabel <- atomically $ readTMVar tabel
+      putStrLn $ show printtabel
+      inputHandler tabel
     ("C") -> do 
       putStrLn $ "Command C"
-      inputHandler
+      inputHandler tabel
     ("D") -> do 
       putStrLn $ "Command D"
-      inputHandler
+      inputHandler tabel
     (_) -> do
       putStrLn $ "wrong input"
-      inputHandler
+      inputHandler tabel
+
+
 
