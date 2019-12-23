@@ -43,7 +43,7 @@ main = do
   listen serverSocket 1024
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
-  tabel <- newEmptyTMVarIO 
+  tabel <- newTMVarIO []
   -- Part 1 Initialisation (Geen idee of dit persee in een apparte thread moet)
   _ <- forkIO $ initialisation me neighbours tabel
   -- -- Part 2 input
