@@ -106,11 +106,12 @@ addtotable tabel neighbour= do
 -- function to write a messsage from node a to b (kunnen we straks mooi gebruiken voor een astractie van de fail en repair messaged ed)
 -- string is voor nu het datatype maar kan mis beter een tuple worden van typebericht en bericht of we kunnen een datatype bericht maken dat
 -- Fail| repair | message is
--- sendmessage :: Int -> Int -> String -> IO ()
--- sendmessage from to message = do 
---   client <- connectSocket to
---   chandle <- socketToHandle client ReadWriteMode
---   hPutStrLn chandle $ "Hi process " ++ show to ++ "! I'm process " ++ show from ++ " and i wanted to say" ++ show message
+-- hij schrijft wel een bericht maar het kan maar zo dat hij constant bezig is met het toevoegen van nieuwe connecties tussen nodes die al geconnect zijn
+sendmessage :: Int -> Int -> String -> IO ()
+sendmessage from to message = do 
+  client <- connectSocket to
+  chandle <- socketToHandle client ReadWriteMode
+  hPutStrLn chandle $ "Hi process " ++ show to ++ "! I'm process " ++ show from ++ " and i wanted to say" ++ show message
 
 -- function to make a connection between two nodes  
 makeConnnection :: Node -> Node -> (TMVar [Connection]) -> IO ()
