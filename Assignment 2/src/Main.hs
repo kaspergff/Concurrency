@@ -150,7 +150,7 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
     ("B") -> do 
       putStrLn $ "Command B"
       handletable' <- atomically $ readTMVar h
-      sendmessage ( lookup port handletable') message
+      --sendmessage ( lookup port handletable') message
       inputHandler n
     ("C") -> do 
       putStrLn $ "Command C"
