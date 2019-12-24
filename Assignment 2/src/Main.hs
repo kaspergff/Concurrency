@@ -154,7 +154,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
   case (com) of
     ("R") -> do 
       printtabel <- atomically $ readTMVar r
-      printRtable me printtabel
+      interlocked lock $ printRtable me printtabel
       inputHandler n lock
     ("B") -> do 
       handletable' <- atomically $ readTMVar h
