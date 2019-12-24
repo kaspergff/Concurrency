@@ -10,13 +10,14 @@ import Data.IORef
 import System.Environment
 import System.IO
 import Network.Socket
+import Data.List
 
 --datatypes
 --vanaf nu is een node gwn lekker een node
 data Node = Node {
-  nodeID :: Int,
+  nodeID       :: Int,
   routingtable :: (TMVar Table),
-  handletable :: (TMVar HandleTable)
+  handletable  :: (TMVar HandleTable)
   }  
 --we moeten die tabel gaan zien als een reachability graph
 --vanaf nu zijn de connecties gwn lekker een eigen type
@@ -96,7 +97,7 @@ handleConnection connection = do
   hPutStrLn chandle "Welcome"
   message <- hGetLine chandle
   putStrLn $ "Incomming connection send a message: " ++ message
-  hClose chandle
+  --hClose chandle
 
 
   -------------------- End Template---------------------
@@ -118,11 +119,14 @@ addtotable routingtable neighbour = do
 -- Fail| repair | message is
 -- hij schrijft wel een bericht maar het kan maar zo dat hij constant bezig is met het toevoegen van nieuwe connecties tussen nodes die al geconnect zijn
 -- het gekke is dus dat hij eig een nieuwe connectie maakt maar je hebt die handle wel nodig om dat bericht te sturen
-sendmessage :: Int -> Int -> String -> IO ()
-sendmessage from to message = do 
-  client <- connectSocket to
-  chandle <- socketToHandle client ReadWriteMode
-  hPutStrLn chandle $ "Hi process " ++ show to ++ "! I'm process " ++ show from ++ " and i wanted to say" ++ show message
+sendmessage :: Maybe Handle -> String -> IO ()
+sendmessage (Just x) message = do
+  putStrLn "test1"
+  hSetBuffering x LineBuffering
+  putStrLn "test2"
+  hPutStrLn x $ " and i wanted to say" ++ show message
+  putStrLn "test3"
+sendmessage (Nothing) _ = putStrLn $ "error message"
 
 connection :: [Int] -> HandleTable
 connection xs = [(x, intToHandle x)|x <- xs]
@@ -145,6 +149,8 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
       inputHandler n
     ("B") -> do 
       putStrLn $ "Command B"
+      handletable' <- atomically $ readTMVar h
+      sendmessage ( lookup port handletable') message
       inputHandler n
     ("C") -> do 
       putStrLn $ "Command C"
