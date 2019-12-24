@@ -25,7 +25,7 @@ instance Show Connection where
   show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
 --tabel is een lijst van connecties
 type Table = [Connection] 
-type NodeHandle = (Int,Handle)
+type NodeHandle = (Int,IO Handle)
 type HandleTable = [NodeHandle]
 
 main :: IO ()
@@ -51,11 +51,11 @@ main = do
   -- routing table
   tabel <- newTMVarIO []
   -- handle table
-  htabel <- newTMVarIO []
+  htabel <- newTMVarIO $ connection neighbours
+
+
   -- make an instance of the node datatype which contains all info in this thread 
   let node = (Node me tabel htabel) 
-  -- Part 1 Initialisation (Geen idee of dit persee in een apparte thread moet)
-  _ <- forkIO $ initialisation node neighbours 
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node
 
@@ -100,12 +100,6 @@ handleConnection connection = do
 
 
   -------------------- End Template---------------------
--- This function sets up the network en tries to connect to al the neighbours
-initialisation :: Node -> [Int] -> IO ()
-initialisation _ []             = do putStrLn "I have no more neighbours :("
-initialisation me (neighbour:xs)  = do
-  makeConnnection me neighbour 
-  initialisation me xs 
 
 --hier moeten we dus nog voor zorgen dat er nog een distance berekend word en word meegegeven maar das voor later zorg
 addtotable :: (TMVar Table) -> Int -> STM ()
@@ -113,10 +107,10 @@ addtotable routingtable neighbour = do
   tabel <- takeTMVar routingtable
   putTMVar routingtable (tabel ++  [(Connection neighbour 1 neighbour)]) 
 
-addToHandleTable :: (TMVar HandleTable) -> Int -> Handle -> STM ()
-addToHandleTable handletable neighbour handle = do
-  htable <- takeTMVar handletable
-  putTMVar handletable (htable ++ [(neighbour,handle)])
+-- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
+-- addToHandleTable handletable neighbour handle = do
+--   htable <- takeTMVar handletable
+--   putTMVar handletable (htable ++ [(neighbour,handle)])
 
 
 -- function to write a messsage from node a to b (kunnen we straks mooi gebruiken voor een astractie van de fail en repair messaged ed)
@@ -130,25 +124,14 @@ sendmessage from to message = do
   chandle <- socketToHandle client ReadWriteMode
   hPutStrLn chandle $ "Hi process " ++ show to ++ "! I'm process " ++ show from ++ " and i wanted to say" ++ show message
 
--- function to make a connection between two nodes  
-makeConnnection :: Node -> Int -> IO ()
-makeConnnection n@(Node {nodeID = me ,routingtable = r, handletable = h}) neighbour = do 
-  putStrLn $ "Connecting to neighbour " ++ show neighbour ++ "..."
-  client <- connectSocket neighbour
+connection :: [Int] -> HandleTable
+connection xs = [(x, intToHandle x)|x <- xs]
+
+intToHandle :: Int -> IO Handle
+intToHandle i = do
+  client <- connectSocket i
   chandle <- socketToHandle client ReadWriteMode
-  -- Send a message over the socket
-  -- You can send and receive messages with a similar API as reading and writing to the console.
-  -- Use `hPutStrLn chandle` instead of `putStrLn`,
-  -- and `hGetLine  chandle` instead of `getLine`.
-  -- You can close a connection with `hClose chandle`.
-  hPutStrLn chandle $ "Hi process " ++ show neighbour ++ "! I'm process " ++ show me ++ " and you are my neighbour."
-  putStrLn "I sent a message to the neighbour"
-  message <- hGetLine chandle
-  putStrLn $ "Neighbour send a message back: " ++ show message
-  atomically $ addtotable r neighbour
-  atomically $ addToHandleTable h neighbour chandle
-
-
+  return chandle
 -- funtion to handle input
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
 inputHandler :: Node -> IO ()
@@ -157,7 +140,6 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
   let (com, port, message) = inputParser input
   case (com) of
     ("R") -> do 
-      --putStrLn $ "Command R"
       printtabel <- atomically $ readTMVar r
       printRtable printtabel
       inputHandler n
@@ -166,8 +148,8 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
       inputHandler n
     ("C") -> do 
       putStrLn $ "Command C"
-      printtabel <- atomically $ readTMVar h
-      putStrLn $ show printtabel
+      -- printtabel <- atomically $ readTMVar h
+      -- putStrLn $ show printtabel
       inputHandler n
     ("D") -> do 
       putStrLn $ "Command D"

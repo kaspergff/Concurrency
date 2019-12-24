@@ -30,7 +30,7 @@ module Main where
       -- Let a seperate thread listen for incomming connections
       _ <- forkIO $ listenForConnections serverSocket
     
-      -- As an example, connect to the first neighbour. This just
+          -- As an example, connect to the first neighbour. This just
       -- serves as an example on using the network functions in Haskell
       case neighbours of
         [] -> putStrLn "I have no neighbours :("
@@ -92,3 +92,5 @@ module Main where
       -------------------- End Template---------------------
       
     
+
+  
