@@ -97,7 +97,7 @@ handleConnection connection = do
   hPutStrLn chandle "// Welcome"
   message <- hGetLine chandle
   putStrLn $ "// Incomming connection send a message: " ++ message
-  --hClose chandle
+  hClose chandle
 
 
   -------------------- End Template---------------------
