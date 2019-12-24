@@ -176,9 +176,10 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
 
 -- Needs improvement       
 inputParser :: String -> (String, Int, String)
-inputParser text | length split < 2 = (com, 1, "") -- the 1 is an placeholder
-        | length split < 3 = (com, port, "")
-        | otherwise = (com, port, message)
+inputParser text  | text == [] = ("", 0, "")
+                  | length split < 2 = (com, 0, "") -- the 0 is an placeholder
+                  | length split < 3 = (com, port, "")
+                  | otherwise = (com, port, message)
   where
     split = words text
     com = head split
