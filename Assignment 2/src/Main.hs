@@ -13,16 +13,18 @@ import Network.Socket
 
 --datatypes
 --vanaf nu is een node gwn lekker een node
-type Node = Int  
+data Node = Node {
+  nodeID :: Int,
+  routingtable :: (TMVar Table),
+  handletable :: (TMVar HandleTable)
+  }  
 --we moeten die tabel gaan zien als een reachability graph
 --vanaf nu zijn de connecties gwn lekker een eigen type
-data Connection = Connection Node Int Node deriving (Show)
+data Connection = Connection Int Int Int deriving (Show)
 --tabel is een lijst van connecties
-type Table = [Connection]
-
-
-
-
+type Table = [Connection] 
+type NodeHandle = (Int,Handle)
+type HandleTable = [NodeHandle]
 
 main :: IO ()
 main = do
@@ -44,26 +46,30 @@ main = do
 
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
-  -- create routing tabel
+  -- routing table
   tabel <- newTMVarIO []
+  -- handle table
+  htabel <- newTMVarIO []
+  -- make an instance of the node datatype which contains all info in this thread 
+  let node = (Node me tabel htabel) 
   -- Part 1 Initialisation (Geen idee of dit persee in een apparte thread moet)
-  _ <- forkIO $ initialisation me neighbours tabel
+  _ <- forkIO $ initialisation node neighbours 
   -- -- Part 2 input
-  _ <- forkIO $ inputHandler tabel
+  _ <- forkIO $ inputHandler node
 
   threadDelay 1000000000
 
-readCommandLineArguments :: IO (Node, [Node])
+readCommandLineArguments :: IO (Int, [Int])
 readCommandLineArguments = do
   args <- getArgs
   case args of
     [] -> error "Not enough arguments. You should pass the port number of the current process and a list of neighbours"
     (me:neighbours) -> return (read me, map read neighbours)
 
-portToAddress :: Node -> SockAddr
+portToAddress :: Int -> SockAddr
 portToAddress portNumber = SockAddrInet (fromIntegral portNumber) (tupleToHostAddress (127, 0, 0, 1)) -- localhost
 
-connectSocket :: Node -> IO Socket
+connectSocket :: Int -> IO Socket
 connectSocket portNumber = connect'
   where
     connect' = do
@@ -93,22 +99,29 @@ handleConnection connection = do
 
   -------------------- End Template---------------------
 -- This function sets up the network en tries to connect to al the neighbours
-initialisation :: Node -> [Node] -> (TMVar [Connection]) -> IO ()
-initialisation _ [] _             = do putStrLn "I have no more neighbours :("
-initialisation me (neighbour:xs) tabel = do
-  makeConnnection me neighbour tabel
-  initialisation me xs tabel
+initialisation :: Node -> [Int] -> IO ()
+initialisation _ []             = do putStrLn "I have no more neighbours :("
+initialisation me (neighbour:xs)  = do
+  makeConnnection me neighbour 
+  initialisation me xs 
 
 --hier moeten we dus nog voor zorgen dat er nog een distance berekend word en word meegegeven maar das voor later zorg
-addtotable :: (TMVar [Connection]) -> Node -> STM ()
-addtotable tabel neighbour= do 
-  lijst <- takeTMVar tabel
-  putTMVar tabel (lijst ++  [(Connection neighbour 1 neighbour)]) 
+addtotable :: (TMVar Table) -> Int -> STM ()
+addtotable routingtable neighbour = do 
+  tabel <- takeTMVar routingtable
+  putTMVar routingtable (tabel ++  [(Connection neighbour 1 neighbour)]) 
+
+addToHandleTable :: (TMVar HandleTable) -> Int -> Handle -> STM ()
+addToHandleTable handletable neighbour handle = do
+  htable <- takeTMVar handletable
+  putTMVar handletable (htable ++ [(neighbour,handle)])
+
 
 -- function to write a messsage from node a to b (kunnen we straks mooi gebruiken voor een astractie van de fail en repair messaged ed)
 -- string is voor nu het datatype maar kan mis beter een tuple worden van typebericht en bericht of we kunnen een datatype bericht maken dat
 -- Fail| repair | message is
 -- hij schrijft wel een bericht maar het kan maar zo dat hij constant bezig is met het toevoegen van nieuwe connecties tussen nodes die al geconnect zijn
+-- het gekke is dus dat hij eig een nieuwe connectie maakt maar je hebt die handle wel nodig om dat bericht te sturen
 sendmessage :: Int -> Int -> String -> IO ()
 sendmessage from to message = do 
   client <- connectSocket to
@@ -116,8 +129,8 @@ sendmessage from to message = do
   hPutStrLn chandle $ "Hi process " ++ show to ++ "! I'm process " ++ show from ++ " and i wanted to say" ++ show message
 
 -- function to make a connection between two nodes  
-makeConnnection :: Node -> Node -> (TMVar [Connection]) -> IO ()
-makeConnnection me neighbour tabel = do 
+makeConnnection :: Node -> Int -> IO ()
+makeConnnection n@(Node {nodeID = me ,routingtable = r, handletable = h}) neighbour = do 
   putStrLn $ "Connecting to neighbour " ++ show neighbour ++ "..."
   client <- connectSocket neighbour
   chandle <- socketToHandle client ReadWriteMode
@@ -130,34 +143,36 @@ makeConnnection me neighbour tabel = do
   putStrLn "I sent a message to the neighbour"
   message <- hGetLine chandle
   putStrLn $ "Neighbour send a message back: " ++ show message
-  atomically $ addtotable tabel neighbour
+  atomically $ addtotable r neighbour
+  atomically $ addToHandleTable h neighbour chandle
 
 
 -- funtion to handle input
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
-inputHandler :: (TMVar [Connection]) -> IO ()
-inputHandler tabel = do
-  input <- getLine
-  let (com, node, message) = inputParser input
+inputHandler :: Node -> IO ()
+inputHandler n@(Node {routingtable = r, handletable = h}) = do
+  com <- getLine
   case (com) of
     ("R") -> do 
       -- sendmessage 1102 1100 "sterf"
       putStrLn $ "Command R"
-      inputHandler tabel
+      inputHandler n
     ("B") -> do 
       putStrLn $ "Command B"
-      printtabel <- atomically $ readTMVar tabel
+      printtabel <- atomically $ readTMVar r
       putStrLn $ show printtabel
-      inputHandler tabel
+      inputHandler n
     ("C") -> do 
       putStrLn $ "Command C"
-      inputHandler tabel
+      printtabel <- atomically $ readTMVar h
+      putStrLn $ show printtabel
+      inputHandler n
     ("D") -> do 
       putStrLn $ "Command D"
-      inputHandler tabel
+      inputHandler n
     (_) -> do
       putStrLn $ "wrong input"
-      inputHandler tabel
+      inputHandler n
 
 -- Needs improvement       
 inputParser :: String -> (String, Node, String)
