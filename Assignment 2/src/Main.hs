@@ -175,13 +175,20 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
       inputHandler n
 
 -- Needs improvement       
-inputParser :: String -> (String, Node, String)
+inputParser :: String -> (String, Int, String)
 inputParser text | length split < 2 = (com, 1, "") -- the 1 is an placeholder
         | length split < 3 = (com, port, "")
         | otherwise = (com, port, message)
   where
     split = words text
     com = head split
-    port = read (split !! 1) :: Node
+    port = read (split !! 1) :: Int
     message = last split
 
+
+
+
+-- Test cases
+-- stack run -- 1100 1101
+-- stack run -- 1101 1100 1102
+-- stack run -- 1102 1101 
