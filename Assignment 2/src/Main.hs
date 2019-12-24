@@ -41,6 +41,8 @@ main = do
   putStrLn $ "I should be listening on port " ++ show me
   putStrLn $ "My initial neighbours are " ++ show neighbours
 
+  lock <- newLock
+
   -- Listen to the specified port.
   serverSocket <- socket AF_INET Stream 0
   setSocketOption serverSocket ReuseAddr 1
@@ -196,7 +198,17 @@ printRtable me table = do
 
 
 
--- Test cases
--- stack run -- 1100 1101
--- stack run -- 1101 1100 1102
--- stack run -- 1102 1101 
+newtype Lock = Lock (MVar ())
+
+newLock :: IO Lock
+newLock = Lock <$> newMVar ()
+
+lock :: Lock -> IO ()
+lock (Lock v) = takeMVar v
+
+unlock :: Lock -> IO ()
+unlock (Lock v) = putMVar v ()
+
+interlocked :: Lock -> IO a -> IO a
+interlocked lock_ action =
+    (lock lock_ *> action) `finally` (unlock lock_)
