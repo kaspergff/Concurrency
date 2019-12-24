@@ -41,7 +41,7 @@ main = do
   putStrLn $ "I should be listening on port " ++ show me
   putStrLn $ "My initial neighbours are " ++ show neighbours
 
-  lock <- newLock
+  lock <- newLock -- write lock
 
   -- Listen to the specified port.
   serverSocket <- socket AF_INET Stream 0
@@ -50,7 +50,7 @@ main = do
   listen serverSocket 1024
 
   -- Let a seperate thread listen for incomming connections
-  _ <- forkIO $ listenForConnections serverSocket
+  _ <- forkIO $ listenForConnections serverSocket lock
   -- routing table
   tabel <- newTMVarIO $ initalRtable neighbours
   -- handle table
@@ -60,7 +60,7 @@ main = do
   -- make an instance of the node datatype which contains all info in this thread 
   let node = (Node me tabel htabel) 
   -- -- Part 2 input
-  _ <- forkIO $ inputHandler node
+  _ <- forkIO $ inputHandler node lock
 
   threadDelay 1000000000
 
@@ -86,19 +86,19 @@ connectSocket portNumber = connect'
           connect'
         Right _ -> return client
 
-listenForConnections :: Socket -> IO ()
-listenForConnections serverSocket = do
+listenForConnections :: Socket -> Lock-> IO ()
+listenForConnections serverSocket lock = do
   (connection, _) <- accept serverSocket
-  _ <- forkIO $ handleConnection connection
-  listenForConnections serverSocket
+  _ <- forkIO $ handleConnection connection lock
+  listenForConnections serverSocket lock
 
-handleConnection :: Socket -> IO ()
-handleConnection connection = do
-  putStrLn "// Got new incomming connection"
+handleConnection :: Socket -> Lock -> IO ()
+handleConnection connection  lock= do
+  --interlocked lock $ putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection ReadWriteMode
-  hPutStrLn chandle "// Welcome"
+  -- hPutStrLn chandle "// Welcome"
   message <- hGetLine chandle
-  putStrLn $ "// Incomming connection send a message: " ++ message
+  interlocked lock $ putStrLn message
   hClose chandle
 
   -------------------- End Template---------------------
@@ -130,11 +130,8 @@ initalRtable xs = map createConnection xs
 sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do
   x' <- x
-  putStrLn "test1"
   hSetBuffering x' LineBuffering
-  putStrLn "test2"
-  hPutStrLn x' $ " and i wanted to say" ++ show message
-  putStrLn "test3"
+  hPutStrLn x' $ id message
 sendmessage (Nothing) _ = putStrLn $ "error message"
 
 -- function to connect to al the neighbours 
@@ -150,31 +147,30 @@ intToHandle i = do
 
 -- funtion to handle input
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
-inputHandler :: Node -> IO ()
-inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) = do
+inputHandler :: Node -> Lock -> IO ()
+inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
   input <- getLine
   let (com, port, message) = inputParser input
   case (com) of
     ("R") -> do 
       printtabel <- atomically $ readTMVar r
       printRtable me printtabel
-      inputHandler n
+      inputHandler n lock
     ("B") -> do 
-      putStrLn $ "Command B"
       handletable' <- atomically $ readTMVar h
       sendmessage ( lookup port handletable') message
-      inputHandler n
+      inputHandler n lock
     ("C") -> do 
       putStrLn $ "Command C"
       -- printtabel <- atomically $ readTMVar h
       -- mapM_ printHtable printtabel
-      inputHandler n
+      inputHandler n lock
     ("D") -> do 
       putStrLn $ "Command D"
-      inputHandler n
+      inputHandler n lock
     (_) -> do
       putStrLn $ "wrong input"
-      inputHandler n
+      inputHandler n lock
 
 -- Needs improvement       
 inputParser :: String -> (String, Int, String)
