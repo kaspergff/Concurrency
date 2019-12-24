@@ -19,15 +19,23 @@ data Node = Node {
   routingtable :: (TMVar Table),
   handletable  :: (TMVar HandleTable)
   }  
+-- ik wil dit graag
+type Port = Int
+
 --we moeten die tabel gaan zien als een reachability graph
 --vanaf nu zijn de connecties gwn lekker een eigen type
 data Connection = Connection Int Int Int
 instance Show Connection where
   show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
+data DistanceTo = DistanceTo Port Int
+
 --tabel is een lijst van connecties
 type Table = [Connection] 
 type NodeHandle = (Int,IO Handle)
 type HandleTable = [NodeHandle]
+type DistanceTable = [DistanceTo]
+
+
 
 main :: IO ()
 main = do
