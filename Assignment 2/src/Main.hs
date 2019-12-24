@@ -99,7 +99,6 @@ handleConnection connection = do
   putStrLn $ "// Incomming connection send a message: " ++ message
   hClose chandle
 
-
   -------------------- End Template---------------------
 
 --hier moeten we dus nog voor zorgen dat er nog een distance berekend word en word meegegeven maar das voor later zorg
