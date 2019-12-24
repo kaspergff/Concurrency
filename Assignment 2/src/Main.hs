@@ -97,13 +97,13 @@ handleConnection connection = do
   hPutStrLn chandle "Welcome"
   message <- hGetLine chandle
   putStrLn $ "Incomming connection send a message: " ++ message
-  hClose chandle
+  --hClose chandle
 
 
   -------------------- End Template---------------------
--- This function sets up the network en tries to connect to al the neighbours
+-- This function sets up the network en tries to connect to all the neighbours
 initialisation :: Node -> [Int] -> IO ()
-initialisation _ []             = do putStrLn "I have no more neighbours :("
+initialisation _ []               = do putStrLn "I have no more neighbours :("
 initialisation me (neighbour:xs)  = do
   makeConnnection me neighbour 
   initialisation me xs 
@@ -126,10 +126,13 @@ addToHandleTable handletable neighbour handle = do
 -- hij schrijft wel een bericht maar het kan maar zo dat hij constant bezig is met het toevoegen van nieuwe connecties tussen nodes die al geconnect zijn
 -- het gekke is dus dat hij eig een nieuwe connectie maakt maar je hebt die handle wel nodig om dat bericht te sturen
 sendmessage :: Maybe Handle -> String -> IO ()
-sendmessage (Just x) message = hPutStrLn x $ " and i wanted to say" ++ show message
+sendmessage (Just x) message = do
+  putStrLn "test1"
+  hSetBuffering x LineBuffering
+  putStrLn "test2"
+  hPutStrLn x $ " and i wanted to say" ++ show message
+  putStrLn "test3"
 sendmessage (Nothing) _ = putStrLn $ "error message"
-
-
 
 -- function to make a connection between two nodes  
 makeConnnection :: Node -> Int -> IO ()
@@ -158,7 +161,7 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
   let (com, port, message) = inputParser input
   case (com) of
     ("R") -> do 
-      --putStrLn $ "Command R"
+      putStrLn $ "Command R"
       printtabel <- atomically $ readTMVar r
       printRtable printtabel
       inputHandler n
