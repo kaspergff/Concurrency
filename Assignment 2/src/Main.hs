@@ -151,16 +151,16 @@ makeConnnection n@(Node {nodeID = me ,routingtable = r, handletable = h}) neighb
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
 inputHandler :: Node -> IO ()
 inputHandler n@(Node {routingtable = r, handletable = h}) = do
-  com <- getLine
+  input <- getLine
+  let (com, port, message) = inputParser input
   case (com) of
     ("R") -> do 
-      -- sendmessage 1102 1100 "sterf"
-      putStrLn $ "Command R"
+      --putStrLn $ "Command R"
+      printtabel <- atomically $ readTMVar r
+      putStrLn $ show printtabel
       inputHandler n
     ("B") -> do 
       putStrLn $ "Command B"
-      printtabel <- atomically $ readTMVar r
-      putStrLn $ show printtabel
       inputHandler n
     ("C") -> do 
       putStrLn $ "Command C"
