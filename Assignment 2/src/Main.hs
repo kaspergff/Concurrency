@@ -50,7 +50,7 @@ main = do
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
   -- routing table
-  tabel <- newTMVarIO []
+  tabel <- newTMVarIO $ initalRtable neighbours
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
 
@@ -92,11 +92,11 @@ listenForConnections serverSocket = do
 
 handleConnection :: Socket -> IO ()
 handleConnection connection = do
-  putStrLn "Got new incomming connection"
+  putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection ReadWriteMode
-  hPutStrLn chandle "Welcome"
+  hPutStrLn chandle "// Welcome"
   message <- hGetLine chandle
-  putStrLn $ "Incomming connection send a message: " ++ message
+  putStrLn $ "// Incomming connection send a message: " ++ message
   --hClose chandle
 
 
@@ -107,6 +107,13 @@ addtotable :: (TMVar Table) -> Int -> STM ()
 addtotable routingtable neighbour = do 
   tabel <- takeTMVar routingtable
   putTMVar routingtable (tabel ++  [(Connection neighbour 1 neighbour)]) 
+
+createConnection :: Int -> Connection
+createConnection int  = Connection int 1 int
+    
+initalRtable :: [Int] -> Table
+initalRtable xs = map createConnection xs
+
 
 -- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
 -- addToHandleTable handletable neighbour handle = do
@@ -128,6 +135,7 @@ sendmessage (Just x) message = do
   putStrLn "test3"
 sendmessage (Nothing) _ = putStrLn $ "error message"
 
+-- function to connect to al the neighbours 
 connection :: [Int] -> HandleTable
 connection xs = [(x, intToHandle x)|x <- xs]
 
@@ -136,16 +144,18 @@ intToHandle i = do
   client <- connectSocket i
   chandle <- socketToHandle client ReadWriteMode
   return chandle
+
+
 -- funtion to handle input
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
 inputHandler :: Node -> IO ()
-inputHandler n@(Node {routingtable = r, handletable = h}) = do
+inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) = do
   input <- getLine
   let (com, port, message) = inputParser input
   case (com) of
     ("R") -> do 
       printtabel <- atomically $ readTMVar r
-      printRtable printtabel
+      printRtable me printtabel
       inputHandler n
     ("B") -> do 
       putStrLn $ "Command B"
@@ -178,9 +188,11 @@ inputParser text  | text == []        = ("", 0, "")-- the 0 is an placeholder
 
 
 -- funtion to print the routing table
-printRtable :: Table -> IO ()
-printRtable [] = return ()
-printRtable table = mapM_ print table
+printRtable :: Int -> Table -> IO ()
+printRtable _ [] = return ()
+printRtable me table = do
+  putStrLn $ show me ++ " 0 local"
+  mapM_ print table
 
 
 
