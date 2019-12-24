@@ -41,8 +41,10 @@ main = do
   setSocketOption serverSocket ReuseAddr 1
   bind serverSocket $ portToAddress me
   listen serverSocket 1024
+
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket
+  -- create routing tabel
   tabel <- newTMVarIO []
   -- Part 1 Initialisation (Geen idee of dit persee in een apparte thread moet)
   _ <- forkIO $ initialisation me neighbours tabel
@@ -135,7 +137,8 @@ makeConnnection me neighbour tabel = do
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
 inputHandler :: (TMVar [Connection]) -> IO ()
 inputHandler tabel = do
-  com <- getLine
+  input <- getLine
+  let (com, node, message) = inputParser input
   case (com) of
     ("R") -> do 
       -- sendmessage 1102 1100 "sterf"
@@ -156,5 +159,14 @@ inputHandler tabel = do
       putStrLn $ "wrong input"
       inputHandler tabel
 
-
+-- Needs improvement       
+inputParser :: String -> (String, Node, String)
+inputParser text | length split < 2 = (com, 1, "") -- the 1 is an placeholder
+        | length split < 3 = (com, port, "")
+        | otherwise = (com, port, message)
+  where
+    split = words text
+    com = head split
+    port = read (split !! 1) :: Node
+    message = last split
 
