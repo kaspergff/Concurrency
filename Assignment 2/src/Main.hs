@@ -99,8 +99,7 @@ handleConnection connection = do
   hPutStrLn chandle "// Welcome"
   message <- hGetLine chandle
   putStrLn $ "// Incomming connection send a message: " ++ message
-  --hClose chandle
-
+  hClose chandle
 
   -------------------- End Template---------------------
 
@@ -128,12 +127,13 @@ initalRtable xs = map createConnection xs
 -- Fail| repair | message is
 -- hij schrijft wel een bericht maar het kan maar zo dat hij constant bezig is met het toevoegen van nieuwe connecties tussen nodes die al geconnect zijn
 -- het gekke is dus dat hij eig een nieuwe connectie maakt maar je hebt die handle wel nodig om dat bericht te sturen
-sendmessage :: Maybe Handle -> String -> IO ()
+sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do
+  x' <- x
   putStrLn "test1"
-  hSetBuffering x LineBuffering
+  hSetBuffering x' LineBuffering
   putStrLn "test2"
-  hPutStrLn x $ " and i wanted to say" ++ show message
+  hPutStrLn x' $ " and i wanted to say" ++ show message
   putStrLn "test3"
 sendmessage (Nothing) _ = putStrLn $ "error message"
 
@@ -162,12 +162,12 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) = do
     ("B") -> do 
       putStrLn $ "Command B"
       handletable' <- atomically $ readTMVar h
-      --sendmessage ( lookup port handletable') message
+      sendmessage ( lookup port handletable') message
       inputHandler n
     ("C") -> do 
       putStrLn $ "Command C"
       -- printtabel <- atomically $ readTMVar h
-      -- putStrLn $ show printtabel
+      -- mapM_ printHtable printtabel
       inputHandler n
     ("D") -> do 
       putStrLn $ "Command D"
@@ -195,6 +195,17 @@ printRtable _ [] = return ()
 printRtable me table = do
   putStrLn $ show me ++ " 0 local"
   mapM_ print table
+
+printHtable :: (Int,IO Handle) -> IO ()
+printHtable (i, iOHANDLE) = do
+  handle <- iOHANDLE
+  print $ show i ++ show handle
+
+-- foo :: (IO a) -> a
+-- foo x = do
+--   x' <- x
+--   return (x')
+
 
 
 
