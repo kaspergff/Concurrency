@@ -21,7 +21,9 @@ data Node = Node {
   }  
 --we moeten die tabel gaan zien als een reachability graph
 --vanaf nu zijn de connecties gwn lekker een eigen type
-data Connection = Connection Int Int Int deriving (Show)
+data Connection = Connection Int Int Int
+instance Show Connection where
+  show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
 --tabel is een lijst van connecties
 type Table       = [Connection] 
 type NodeHandle  = (Int,Handle)
@@ -158,7 +160,7 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
     ("R") -> do 
       --putStrLn $ "Command R"
       printtabel <- atomically $ readTMVar r
-      putStrLn $ show printtabel
+      printRtable printtabel
       inputHandler n
     ("B") -> do 
       putStrLn $ "Command B"
@@ -179,16 +181,21 @@ inputHandler n@(Node {routingtable = r, handletable = h}) = do
 
 -- Needs improvement       
 inputParser :: String -> (String, Int, String)
-inputParser text  | text == [] = ("", 0, "")
-                  | length split < 2 = (com, 0, "") -- the 0 is an placeholder
-                  | length split < 3 = (com, port, "")
-                  | otherwise = (com, port, message)
+inputParser text  | text == []        = ("", 0, "")-- the 0 is an placeholder
+                  | length split < 2  = (com, 0, "") 
+                  | length split < 3  = (com, port, "")
+                  | otherwise         = (com, port, message)
   where
     split = words text
     com = head split
     port = read (split !! 1) :: Int
     message = last split
 
+
+-- funtion to print the routing table
+printRtable :: Table -> IO ()
+printRtable [] = return ()
+printRtable table = mapM_ print table
 
 
 
