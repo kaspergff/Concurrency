@@ -1,4 +1,3 @@
-
 module Main where
 
 import NetwerkFunctions
@@ -40,15 +39,16 @@ main = do
   _ <- forkIO $ listenForConnections serverSocket lock
   
   -- initialization
-  tabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a ((length neighbours)+1) "udef"| a <- neighbours]
-  -- send message
+  routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a ((length neighbours)+1) "udef"| a <- neighbours]
+  nbDistanceTable <- newTMVarIO $ [Connection from ((length neighbours)+1) to| to <- neighbours, from <- neighbours]
+  -- send message MyDist
 
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
 
 
   -- make an instance of the node datatype which contains all info in this thread 
-  let node = (Node me tabel htabel) 
+  let node = (Node me routingTabel htabel nbDistanceTable) 
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node lock
 
@@ -182,7 +182,6 @@ inputParser text  | text == []        = ("", 0, "")-- the 0 is an placeholder
 printRtable :: Int -> Table -> IO ()
 printRtable _ [] = return ()
 printRtable me table = do
-  putStrLn $ show me ++ " 0 local"
   mapM_ print table
 
 printHtable :: (Int,IO Handle) -> IO ()

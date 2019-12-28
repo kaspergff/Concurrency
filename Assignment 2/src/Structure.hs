@@ -16,7 +16,8 @@ import Data.List
 data Node = Node {
     nodeID       :: Int,
     routingtable :: (TMVar Table),
-    handletable  :: (TMVar HandleTable)
+    handletable  :: (TMVar HandleTable),
+    neighbourDistanceTable :: (TMVar NeighbouDistanceTable)
     }  
 -- ik wil dit graag
 type Port = Int
@@ -26,6 +27,7 @@ type Port = Int
 data Connection = Connection Port Int Port | DConnection Port Int String
 instance Show Connection where
     show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
+    show (DConnection a b c) = show a ++ " "++ show b ++ " " ++ c
 data DistanceTo = DistanceTo Port Int
 
 --tabel is een lijst van connecties
@@ -35,3 +37,5 @@ type HandleTable = [NodeHandle]
 
 -- lijst met afstand tot alle bekende Nodes
 type DistanceTable = [DistanceTo] --Du
+
+type NeighbouDistanceTable = [Connection]
