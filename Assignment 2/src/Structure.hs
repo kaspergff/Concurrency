@@ -17,7 +17,7 @@ data Node = Node {
     nodeID       :: Int,
     routingtable :: (TMVar Table),
     handletable  :: (TMVar HandleTable),
-    neighbourDistanceTable :: (TMVar NeighbouDistanceTable)
+    neighbourDistanceTable :: (TVar NeighbouDistanceTable)
     }  
 -- ik wil dit graag
 type Port = Int
