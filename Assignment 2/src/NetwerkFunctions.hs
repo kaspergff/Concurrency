@@ -49,9 +49,9 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
         if d + 1 < 999
             then addToRoutingTable r newCon
         else addToRoutingTable r (DConnection too 999 "undef")
-
-    -- if oldDistance > (d + 1)
-    -- sendmessage (d+1) -- moet die dus naar alle buren zijn afstand naar de int sturen
+    -- if oldDistance /= (d + 1)
+    --     then return()
+    -- else return() 
 
 --processing received mydist message
 --upon failure of channel
@@ -73,5 +73,7 @@ addToRoutingTable rt con@(Connection to dis via) = do
     putTMVar rt $ newList ++ [con]
     return ()
 
-
-
+--getDistanceToPortFromRoutingTable :: Table -> Port -> IO() 
+getDistanceToPortFromRoutingTable rt des = do
+    check <- find (\(Connection x _ _) -> x == des) rt
+    return()
