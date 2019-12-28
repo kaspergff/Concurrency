@@ -83,16 +83,21 @@ listenForConnections serverSocket lock = do
   listenForConnections serverSocket lock
 
 handleConnection :: Socket -> Lock -> IO ()
-handleConnection connection lock = do
+handleConnection connection lock htabel = do
   --interlocked lock $ putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection ReadWriteMode
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
   let messagetype = head (words line)
   let message = concat (tail (words line))
+  let sender = lookup chandle htabel
   case (messagetype) of
     --("Fail") -> do 
-    --("Mydist") -> do
+    ("Mydist") -> do
+      --get w
+      --get v & d
+      --ndis u [w,v] := d
+      --recompute v
     --("Repair") -> do
     ("StringMessage") -> do 
       interlocked lock $ putStrLn message
@@ -117,8 +122,8 @@ initalRtable xs = map createConnection xs
 
 -- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
 -- addToHandleTable handletable neighbour handle = do
---   htable <- takeTMVar handletable
---   putTMVar handletable (htable ++ [(neighbour,handle)])
+-- htable <- takeTMVar handletable
+-- putTMVar handletable (htable ++ [(neighbour,handle)])
 
 sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do
