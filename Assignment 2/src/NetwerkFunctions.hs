@@ -39,7 +39,7 @@ import Data.List
 
 recompute :: Node -> Port -> STM ()    
 recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
-    --let oldDistance = getDistanceTo int -- moet dit hebben voor die laatste stap?
+    let oldDistance = getDistanceToPortFromRoutingTable r int -- moet dit hebben voor die laatste stap?
     if me == int 
         then return () -- improve
     else do
@@ -49,9 +49,9 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
         if d + 1 < 999
             then addToRoutingTable r newCon
         else addToRoutingTable r (DConnection too 999 "undef")
-    -- if oldDistance /= (d + 1)
-    --     then return()
-    -- else return() 
+    if oldDistance /= (d + 1)
+        then return()
+    else return() 
 
 --processing received mydist message
 --upon failure of channel
@@ -73,7 +73,11 @@ addToRoutingTable rt con@(Connection to dis via) = do
     putTMVar rt $ newList ++ [con]
     return ()
 
---getDistanceToPortFromRoutingTable :: Table -> Port -> IO() 
+getDistanceToPortFromRoutingTable :: TMVar Table -> Port -> STM(Int) 
 getDistanceToPortFromRoutingTable rt des = do
-    check <- find (\(Connection x _ _) -> x == des) rt
-    return()
+    table <- readTMVar rt
+    let check = find (\(Connection x _ _) -> x == des) table
+    case check of
+        Just (Connection _ dis _) -> return dis
+        Nothing -> return (999)
+
