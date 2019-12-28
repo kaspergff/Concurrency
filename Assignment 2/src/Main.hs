@@ -38,17 +38,22 @@ main = do
 
 
   
-  -- initialization
-  routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a 999 "udef"| a <- neighbours]
-  nbDistanceTable <- newTMVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
-  -- send message MyDist
 
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
 
+  -- initialization
+  routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a 999 "udef"| a <- neighbours]
+  nbDistanceTable <- newTMVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
+
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = (Node me routingTabel htabel nbDistanceTable) 
+
+  
+  -- send message MyDist
+  sendmydistmessage node me 0
+
 
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock node
@@ -92,7 +97,7 @@ handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTab
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
   let messagetype = head (words line)
-  let sender = read (words line !! 1) 
+  let sender = (words line !! 1) 
   let content = (((words line) \\ [messagetype]) \\ [sender])
   
   
@@ -103,12 +108,12 @@ handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTab
       let d = read (last content) :: Int
       let s = read (sender) :: Int
       atomically $ updateNdisUTable nt (Connection s d v) 
-      atomically $ recompute n v  
+      recompute n v  
     --("Repair") -> do
     ("StringMessage") -> do 
       interlocked lock $ putStrLn (concat content)
     (_) -> do
-      interlocked lock $ putStrLn  "fakkadezewerktniet"
+      interlocked lock $ putStrLn  line
   hClose chandle
 
   -------------------- End Template---------------------
@@ -140,20 +145,6 @@ initalRtable xs = map createConnection xs
 -- addToHandleTable handletable neighbour handle = do
 -- htable <- takeTMVar handletable
 -- putTMVar handletable (htable ++ [(neighbour,handle)])
-
-sendmydistmessage :: Node -> Port -> Int ->  [IO ()]
-sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
-  let handletable' = atomically $ readTMVar h
-  map (flip sendmessage "jemoeder") (map snd handletable')
-
-
-
-sendmessage :: Maybe (IO Handle) -> String -> IO ()
-sendmessage (Just x) message = do
-  x' <- x
-  hSetBuffering x' LineBuffering
-  hPutStrLn x' $ id message
-sendmessage (Nothing) _ = putStrLn $ show  "error message"
 
 -- function to connect to al the neighbours 
 connection :: [Int] -> HandleTable
