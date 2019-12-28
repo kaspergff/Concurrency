@@ -1,6 +1,9 @@
 
 module Main where
 
+import NetwerkFunctions
+import Structure
+
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -11,32 +14,6 @@ import System.Environment
 import System.IO
 import Network.Socket
 import Data.List
-
---datatypes
---vanaf nu is een node gwn lekker een node
-data Node = Node {
-  nodeID       :: Int,
-  routingtable :: (TMVar Table),
-  handletable  :: (TMVar HandleTable)
-  }  
--- ik wil dit graag
-type Port = Int
-
---we moeten die tabel gaan zien als een reachability graph
---vanaf nu zijn de connecties gwn lekker een eigen type
-data Connection = Connection Port Int Port | DConnection Port Int String
-instance Show Connection where
-  show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
-data DistanceTo = DistanceTo Port Int
-
---tabel is een lijst van connecties
-type Table = [Connection] 
-type NodeHandle = (Int,IO Handle)
-type HandleTable = [NodeHandle]
-
--- lijst met afstand tot alle bekende Nodes
-type DistanceTable = [DistanceTo]
-
 
 
 main :: IO ()
@@ -61,8 +38,11 @@ main = do
 
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock
-  -- routing table
-  tabel <- newTMVarIO $ initalRtable neighbours
+  
+  -- initialization
+  tabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a ((length neighbours)+1) "udef"| a <- neighbours]
+  -- send message
+
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
 
@@ -121,7 +101,7 @@ addtotable routingtable neighbour = do
 
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int
-    
+     
 initalRtable :: [Int] -> Table
 initalRtable xs = map createConnection xs
 

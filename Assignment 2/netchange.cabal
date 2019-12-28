@@ -25,7 +25,9 @@ executable netchange
   -- main-is:          Solution.hs
 
   other-modules:
-      Paths_netchange
+      Paths_netchange,
+      NetwerkFunctions,
+      Structure  
 
   ghc-options:
       -Wall
