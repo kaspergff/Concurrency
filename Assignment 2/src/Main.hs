@@ -108,7 +108,7 @@ handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTab
     ("StringMessage") -> do 
       interlocked lock $ putStrLn (concat content)
     (_) -> do
-      interlocked lock $ putStrLn  "fakkadezewerktniet"
+      interlocked lock $ putStrLn  line
   hClose chandle
 
   -------------------- End Template---------------------
@@ -142,9 +142,13 @@ initalRtable xs = map createConnection xs
 -- putTMVar handletable (htable ++ [(neighbour,handle)])
 
 --sendmydistmessage :: Node -> Port -> Int ->  [IO ()]
--- sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
---   let handletable' = atomically $ readTMVar h
---   map (flip sendmessage "jemoeder") (map snd handletable')
+--sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
+sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
+  h' <- atomically $ readTMVar h
+  let receivers = map snd h'
+  let message = ("Mydist " ++ show id ++ " " ++ show to ++ " " ++ show dist)
+  let justreceivers = map (\x -> (Just x)) receivers
+  mapM_ (flip sendmessage message ) justreceivers 
 
 sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do

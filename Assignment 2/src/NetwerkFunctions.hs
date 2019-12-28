@@ -37,21 +37,21 @@ import Data.List
 --             forall x ∈ Neighu do send h mydist, v, Du[v]i to x
 --     end
 
-recompute :: Node -> Port -> STM ()    
-recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
-    let oldDistance = getDistanceToPortFromRoutingTable r int -- moet dit hebben voor die laatste stap?
-    if me == int 
-        then return () -- improve
-    else do
-        bn <- readTMVar bnTable
-        let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
-        let newCon = Connection too (d+1) from
-        if d + 1 < 999
-            then addToRoutingTable r newCon
-        else addToRoutingTable r (DConnection too 999 "undef")
-    if oldDistance /= (d + 1)
-        then return()
-    else return() 
+-- recompute :: Node -> Port -> STM ()    
+-- recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
+--     let oldDistance = getDistanceToPortFromRoutingTable r int -- moet dit hebben voor die laatste stap?
+--     if me == int 
+--         then return () -- improve
+--     else do
+--         bn <- readTMVar bnTable
+--         let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
+--         let newCon = Connection too (d+1) from
+--         if d + 1 < 999
+--             then addToRoutingTable r newCon
+--         else addToRoutingTable r (DConnection too 999 "undef")
+--     if oldDistance /= (d + 1)
+--         then return()
+--     else return() 
 
 --processing received mydist message
 --upon failure of channel
