@@ -68,6 +68,7 @@ getDistanceToPortFromRoutingTable rt des = do
     case check of
         Just (Connection _ dis _) -> dis
         Nothing -> (999)
+        
 
 --sendmydistmessage :: Node -> Port -> Int ->  [IO ()]
 --sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
