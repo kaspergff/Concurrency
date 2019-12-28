@@ -25,7 +25,7 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
     rtable <- atomically $ readTMVar r
     let oldDistance = getDistanceToPortFromRoutingTable rtable int -- moet dit hebben voor die laatste stap?
     if me == int 
-        then return () -- improve
+        then atomically $ addToRoutingTable r (Connection int 0 (-1))
     else do
         bn <- atomically $ readTMVar bnTable
         let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
@@ -33,11 +33,11 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
         if d + 1 < 999
             then do 
                 atomically $ addToRoutingTable r newCon
-                sendmydistmessage n int (d+1) 
+                --sendmydistmessage n int (d+1) 
         else atomically $ addToRoutingTable r (Connection too 999 (-2))
-        -- if oldDistance /= (d + 1)
-        --     then sendmydistmessage n int (d+1)               
-        -- else return() 
+        if oldDistance /= (d + 1)
+            then sendmydistmessage n int (d+1)               
+        else return() 
 
 --processing received mydist message
 --upon failure of channel

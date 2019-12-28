@@ -42,7 +42,7 @@ main = do
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
 
-  -- initialization
+  -- initialization -1 = local -2 = udef
   routingTabel <- newTMVarIO $ [Connection me 0 (-1)] ++ [Connection a 999 (-2)| a <- neighbours]
   nbDistanceTable <- newTMVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
 
