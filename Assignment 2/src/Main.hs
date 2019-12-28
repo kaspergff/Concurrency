@@ -13,6 +13,7 @@ import System.Environment
 import System.IO
 import Network.Socket
 import Data.List
+import Data.Tuple
 
 
 main :: IO ()
@@ -35,8 +36,7 @@ main = do
   bind serverSocket $ portToAddress me
   listen serverSocket 1024
 
-  -- Let a seperate thread listen for incomming connections
-  _ <- forkIO $ listenForConnections serverSocket lock
+
   
   -- initialization
   routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a ((length neighbours)+1) "udef"| a <- neighbours]
@@ -49,6 +49,9 @@ main = do
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = (Node me routingTabel htabel nbDistanceTable) 
+
+  -- Let a seperate thread listen for incomming connections
+  _ <- forkIO $ listenForConnections serverSocket lock node
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node lock
 
@@ -76,34 +79,44 @@ connectSocket portNumber = connect'
           connect'
         Right _ -> return client
 
-listenForConnections :: Socket -> Lock-> IO ()
-listenForConnections serverSocket lock = do
+listenForConnections :: Socket -> Lock -> Node -> IO ()
+listenForConnections serverSocket lock node = do
   (connection, _) <- accept serverSocket
-  _ <- forkIO $ handleConnection connection lock
-  listenForConnections serverSocket lock
+  _ <- forkIO $ handleConnection connection lock node
+  listenForConnections serverSocket lock node
 
-handleConnection :: Socket -> Lock -> IO ()
-handleConnection connection lock htabel = do
+handleConnection :: Socket -> Lock -> Node -> IO ()
+handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTable = nt}) = do
   --interlocked lock $ putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection ReadWriteMode
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
   let messagetype = head (words line)
-  let message = concat (tail (words line))
-  let sender = lookup chandle htabel
+  let sender = (words line !! 1)
+  let content = (((words line) \\ [messagetype]) \\ [sender])
+  
+  
   case (messagetype) of
     --("Fail") -> do 
     ("Mydist") -> do
-      --get w
-      --get v & d
-      --ndis u [w,v] := d
-      --recompute v
+      let v = head content
+      let d = last content
+    --   updatetable nt sender v d 
+      recompute n v  
     --("Repair") -> do
     ("StringMessage") -> do 
-      interlocked lock $ putStrLn message
+      interlocked lock $ putStrLn (concat content)
     (_) -> do
       interlocked lock $ putStrLn  "fakkadezewerktniet"
   hClose chandle
+
+getsender :: Handle -> HandleTable -> IO Int
+getsender _ [] = return 1000000
+getsender h ((neighbour, handle):xs) = do
+  handle' <- handle
+  if handle' == h
+    then return neighbour
+    else getsender h xs
 
   -------------------- End Template---------------------
 
@@ -119,6 +132,9 @@ createConnection int  = Connection int 1 int
 initalRtable :: [Int] -> Table
 initalRtable xs = map createConnection xs
 
+
+        
+   
 
 -- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
 -- addToHandleTable handletable neighbour handle = do
@@ -160,8 +176,8 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
       inputHandler n lock
     ("C") -> do 
       putStrLn $ "Command C"
-      -- printtabel <- atomically $ readTMVar h
-      -- mapM_ printHtable printtabel
+      printtabel <- atomically $ readTMVar h
+      mapM_ printHtable printtabel
       inputHandler n lock
     ("D") -> do 
       putStrLn $ "Command D"
