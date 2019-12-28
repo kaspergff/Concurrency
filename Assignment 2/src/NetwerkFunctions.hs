@@ -19,13 +19,6 @@ import Data.List
 -- NBu    :: [Int]  array of nodes NBU [v] is preffered neighbor of v
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
 
-
-
-
-
-
-
-
 --recompute
 
 
@@ -46,7 +39,7 @@ import Data.List
 
 -- recompute :: Node -> Int -> STM ()    
 -- recompute n@(Node {nodeID = me, routingtable = r ,netwerkSize = n, estimatedD = ed}) int = do
---     let oldDistance = getDistanceTo int -- moet dit hebben voor die laatste stap?
+--     --let oldDistance = getDistanceTo int -- moet dit hebben voor die laatste stap?
 --     if me == int 
 --         then return () -- improve
 --     else do
@@ -64,3 +57,8 @@ import Data.List
 --processing received mydist message
 --upon failure of channel
 --upon repair of channel
+
+-- function to get the min distance to a node from all neighbours
+-- getMinDistanceFromNBto :: NeighbouDistanceTable -> Port -> (Int -> Port)
+-- getMinDistanceFromNBto nb
+
