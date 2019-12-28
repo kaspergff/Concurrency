@@ -103,12 +103,21 @@ listenForConnections serverSocket lock = do
   listenForConnections serverSocket lock
 
 handleConnection :: Socket -> Lock -> IO ()
-handleConnection connection  lock= do
+handleConnection connection lock = do
   --interlocked lock $ putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection ReadWriteMode
   -- hPutStrLn chandle "// Welcome"
-  message <- hGetLine chandle
-  interlocked lock $ putStrLn message
+  line <- hGetLine chandle
+  let messagetype = head (words line)
+  let message = concat (tail (words line))
+  case (messagetype) of
+    --("Fail") -> do 
+    --("Mydist") -> do
+    --("Repair") -> do
+    ("StringMessage") -> do 
+      interlocked lock $ putStrLn message
+    (_) -> do
+      interlocked lock $ putStrLn  "fakkadezewerktniet"
   hClose chandle
 
   -------------------- End Template---------------------
@@ -131,18 +140,12 @@ initalRtable xs = map createConnection xs
 --   htable <- takeTMVar handletable
 --   putTMVar handletable (htable ++ [(neighbour,handle)])
 
-
--- function to write a messsage from node a to b (kunnen we straks mooi gebruiken voor een astractie van de fail en repair messaged ed)
--- string is voor nu het datatype maar kan mis beter een tuple worden van typebericht en bericht of we kunnen een datatype bericht maken dat
--- Fail| repair | message is
--- hij schrijft wel een bericht maar het kan maar zo dat hij constant bezig is met het toevoegen van nieuwe connecties tussen nodes die al geconnect zijn
--- het gekke is dus dat hij eig een nieuwe connectie maakt maar je hebt die handle wel nodig om dat bericht te sturen
 sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do
   x' <- x
   hSetBuffering x' LineBuffering
   hPutStrLn x' $ id message
-sendmessage (Nothing) _ = putStrLn $ "error message"
+sendmessage (Nothing) _ = putStrLn $ show  "error message"
 
 -- function to connect to al the neighbours 
 connection :: [Int] -> HandleTable
@@ -168,7 +171,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
       inputHandler n lock
     ("B") -> do 
       handletable' <- atomically $ readTMVar h
-      sendmessage ( lookup port handletable') message
+      sendmessage ( lookup port handletable') ("StringMessage " ++ message)
       inputHandler n lock
     ("C") -> do 
       putStrLn $ "Command C"
@@ -206,14 +209,6 @@ printHtable :: (Int,IO Handle) -> IO ()
 printHtable (i, iOHANDLE) = do
   handle <- iOHANDLE
   print $ show i ++ show handle
-
--- foo :: (IO a) -> a
--- foo x = do
---   x' <- x
---   return (x')
-
-
-
 
 newtype Lock = Lock (MVar ())
 
