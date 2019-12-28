@@ -43,7 +43,7 @@ main = do
   htabel <- newTMVarIO $ connection neighbours
 
   -- initialization
-  routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a 999 "udef"| a <- neighbours]
+  routingTabel <- newTMVarIO $ [Connection me 0 (-1)] ++ [Connection a 999 (-2)| a <- neighbours]
   nbDistanceTable <- newTMVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
 
 

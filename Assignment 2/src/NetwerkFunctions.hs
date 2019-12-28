@@ -20,7 +20,7 @@ import Data.List
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
     
 
---recompute :: Node -> Port -> IO ()    
+recompute :: Node -> Port -> IO ()    
 recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
     rtable <- atomically $ readTMVar r
     let oldDistance = getDistanceToPortFromRoutingTable rtable int -- moet dit hebben voor die laatste stap?
@@ -31,12 +31,13 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
         let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
         let newCon = Connection too (d+1) from
         if d + 1 < 999
-            then atomically $ addToRoutingTable r newCon
-        else atomically $ addToRoutingTable r (DConnection too 999 "undef")
-        if oldDistance /= (d + 1)
-            then sendmydistmessage n int (d+1)
-                 
-        else return() 
+            then do 
+                atomically $ addToRoutingTable r newCon
+                sendmydistmessage n int (d+1) 
+        else atomically $ addToRoutingTable r (Connection too 999 (-2))
+        -- if oldDistance /= (d + 1)
+        --     then sendmydistmessage n int (d+1)               
+        -- else return() 
 
 --processing received mydist message
 --upon failure of channel
@@ -53,7 +54,7 @@ getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port =
 
 --function to add a connection to the routing table
 addToRoutingTable :: TMVar Table -> Connection -> STM ()
-addToRoutingTable rt con@(Connection to dis via) = do
+addToRoutingTable rt con@(Connection to _ _) = do
     table <- takeTMVar rt
     if (length table) < 1
         then putTMVar rt $ table ++ [con]
@@ -62,13 +63,15 @@ addToRoutingTable rt con@(Connection to dis via) = do
         putTMVar rt $ newList ++ [con]
         return ()
 
+
 getDistanceToPortFromRoutingTable :: Table -> Port -> Int
 getDistanceToPortFromRoutingTable rt des = do
     let check = find (\(Connection x _ _) -> x == des) rt
     case check of
         Just (Connection _ dis _) -> dis
         Nothing -> (999)
-        
+
+
 
 --sendmydistmessage :: Node -> Port -> Int ->  [IO ()]
 --sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do

@@ -24,10 +24,10 @@ type Port = Int
 
 --we moeten die tabel gaan zien als een reachability graph
 --vanaf nu zijn de connecties gwn lekker een eigen type
-data Connection = Connection Port Int Port | DConnection Port Int String
+data Connection = Connection Port Int Port -- | DConnection Port Int String
 instance Show Connection where
     show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
-    show (DConnection a b c) = show a ++ " "++ show b ++ " " ++ c
+    --show (DConnection a b c) = show a ++ " "++ show b ++ " " ++ c
 data DistanceTo = DistanceTo Port Int
 
 --tabel is een lijst van connecties
