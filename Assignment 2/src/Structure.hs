@@ -26,13 +26,14 @@ type Port = Int
 --vanaf nu zijn de connecties gwn lekker een eigen type
 data Connection = Connection Port Int Port -- | DConnection Port Int String
 instance Show Connection where
-    show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
-    --show (DConnection a b c) = show a ++ " "++ show b ++ " " ++ c
+    show (Connection a b (-2)) = show a ++ " " ++ show b ++ " " ++ "udef"
+    show (Connection a b (-1)) = show a ++ " " ++ show b ++ " " ++ "local"
+    show (Connection a b c)    = show a ++ " " ++ show b ++ " " ++ show c
 data DistanceTo = DistanceTo Port Int
 
 --tabel is een lijst van connecties
-type Table = [Connection] 
-type NodeHandle = (Int,IO Handle)
+type Table       = [Connection] 
+type NodeHandle  = (Int,IO Handle)
 type HandleTable = [NodeHandle]
 
 -- lijst met afstand tot alle bekende Nodes
