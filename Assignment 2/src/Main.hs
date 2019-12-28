@@ -39,8 +39,8 @@ main = do
   _ <- forkIO $ listenForConnections serverSocket lock
   
   -- initialization
-  routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a ((length neighbours)+1) "udef"| a <- neighbours]
-  nbDistanceTable <- newTMVarIO $ [Connection from ((length neighbours)+1) to| to <- neighbours, from <- neighbours]
+  routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a 999 "udef"| a <- neighbours]
+  nbDistanceTable <- newTVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
   -- send message MyDist
 
   -- handle table

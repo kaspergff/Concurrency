@@ -37,28 +37,41 @@ import Data.List
 --             forall x ∈ Neighu do send h mydist, v, Du[v]i to x
 --     end
 
--- recompute :: Node -> Int -> STM ()    
--- recompute n@(Node {nodeID = me, routingtable = r ,netwerkSize = n, estimatedD = ed}) int = do
---     --let oldDistance = getDistanceTo int -- moet dit hebben voor die laatste stap?
---     if me == int 
---         then return () -- improve
---     else do
---         (d, portNumber) = getMinDistanceFromNBto int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
---         if (d + 1 ) < n
---             then = do
---                 updataDistanceTable ed int (d+1)
---                 addToRoutingTable r int portNumber (d+1)
---         else = do
---             updataDistance ed int n
---             addToRoutingTable r int undef -- dit moet sws nog heel anders ff over
---     if oldDistance > (d + 1)
---         sendmessage (d+1) -- moet die dus naar alle buren zijn afstand naar de int sturen
-    
+recompute :: Node -> Port -> STM ()    
+recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
+    --let oldDistance = getDistanceTo int -- moet dit hebben voor die laatste stap?
+    if me == int 
+        then return () -- improve
+    else do
+        bn <- readTVar bnTable
+        let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
+        let newCon = Connection too (d+1) from
+        if d + 1 < 999
+            then addToRoutingTable r newCon
+        else addToRoutingTable r (DConnection too 999 "undef")
+
+    -- if oldDistance > (d + 1)
+    -- sendmessage (d+1) -- moet die dus naar alle buren zijn afstand naar de int sturen
+
 --processing received mydist message
 --upon failure of channel
 --upon repair of channel
 
--- function to get the min distance to a node from all neighbours
--- getMinDistanceFromNBto :: NeighbouDistanceTable -> Port -> (Int -> Port)
--- getMinDistanceFromNBto nb
+-- function to get the min distance to a node from NeighbouDistanceTable
+getMinDistanceFromNBto :: NeighbouDistanceTable -> Port -> Connection
+getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port = 
+    if a < b && pa == port
+        then getMinDistanceFromNBto (x:xs) port
+        else getMinDistanceFromNBto (y:xs) port
+
+
+--function to add a connection to the routing table
+addToRoutingTable :: TMVar Table -> Connection -> STM ()
+addToRoutingTable rt con@(Connection to dis via) = do
+    table <- takeTMVar rt
+    let newList = filter (\(Connection x _ _) -> x /= to) table
+    putTMVar rt $ newList ++ [con]
+    return ()
+
+
 
