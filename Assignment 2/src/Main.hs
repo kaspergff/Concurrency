@@ -24,7 +24,7 @@ type Port = Int
 
 --we moeten die tabel gaan zien als een reachability graph
 --vanaf nu zijn de connecties gwn lekker een eigen type
-data Connection = Connection Int Int Int
+data Connection = Connection Port Int Port | DConnection Port Int String
 instance Show Connection where
   show (Connection a b c) = show a ++ " "++ show b ++ " " ++ show c
 data DistanceTo = DistanceTo Port Int
@@ -33,6 +33,8 @@ data DistanceTo = DistanceTo Port Int
 type Table = [Connection] 
 type NodeHandle = (Int,IO Handle)
 type HandleTable = [NodeHandle]
+
+-- lijst met afstand tot alle bekende Nodes
 type DistanceTable = [DistanceTo]
 
 

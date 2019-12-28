@@ -5,11 +5,27 @@
 -- Du     :: [0..N]                Du [v] estimates d(u,v)
 -- NBu    :: [Int]  array of nodes NBU [v] is preffered neighbor of v
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
---initialization
+--initialization'
+Initialization:
+    begin forall w ∈ Neighu, v ∈ V do ndisu[w, v] := N ;
+        forall v ∈ V do
+            begin Du[v] := N ; Nbu[v] := udef end ;
+        Du[u] := 0 ; Nbu[u] := local ;
+        forall w ∈ Neighu do send h mydist, u, 0 i to w
+    end
+
+initialization :: Node -> [Int] -> 
+initialization n@(Node {estimatedD = ed }) neighbours = do
+    let n = 1 + $ length neighbours
+
+
+
+
+
+
+
 --recompute
---processing received mydist message
---upon failure of channel
---upon repair of channel
+
 
 Procedure Recompute (v):
     begin if v = u
@@ -43,4 +59,6 @@ recompute n@(Node {nodeID = me, routingtable = r ,netwerkSize = n, estimatedD = 
     if oldDistance > (d + 1)
         sendmessage (d+1) -- moet die dus naar alle buren zijn afstand naar de int sturen
     
-
+--processing received mydist message
+--upon failure of channel
+--upon repair of channel
