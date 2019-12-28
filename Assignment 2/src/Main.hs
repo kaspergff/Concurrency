@@ -141,10 +141,10 @@ initalRtable xs = map createConnection xs
 -- htable <- takeTMVar handletable
 -- putTMVar handletable (htable ++ [(neighbour,handle)])
 
--- sendmydistmessage :: Node -> Port -> Int -> [Port] -> IO ()
--- sendmydistmessage n@(Node {nodeID = id, handletable = handletable}) to dist receivers = do
---   handletable' <- handletable
---   map flip sendmessage  ("StringMessage " ++ message) (map (lookup port handletable'))
+--sendmydistmessage :: Node -> Port -> Int ->  [IO ()]
+-- sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
+--   let handletable' = atomically $ readTMVar h
+--   map (flip sendmessage "jemoeder") (map snd handletable')
 
 sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do
