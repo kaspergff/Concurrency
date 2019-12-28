@@ -19,7 +19,6 @@ import Data.List
 -- NBu    :: [Int]  array of nodes NBU [v] is preffered neighbor of v
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
     
-
 recompute :: Node -> Port -> IO ()    
 recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
     rtable <- atomically $ readTMVar r

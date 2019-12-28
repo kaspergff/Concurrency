@@ -10,7 +10,6 @@ import System.IO
 import Network.Socket
 import Data.List
 
-
 --datatypes
 --vanaf nu is een node gwn lekker een node
 data Node = Node {
@@ -39,4 +38,4 @@ type HandleTable = [NodeHandle]
 -- lijst met afstand tot alle bekende Nodes
 type DistanceTable = [DistanceTo] --Du
 
-type NeighbourDistanceTable  = [Connection]
+type NeighbourDistanceTable = [Connection]

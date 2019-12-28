@@ -19,47 +19,35 @@ import Data.Tuple
 main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
-
   -- me :: Int is the port number of this process
   -- neighbours :: [Int] is a list of the port numbers of the initial neighbours
   -- During the execution, connections may be broken or constructed
   (me, neighbours) <- readCommandLineArguments
-
   putStrLn $ "I should be listening on port " ++ show me
-  putStrLn $ "My initial neighbours are " ++ show neighbours
-
+  putStrLn $ "My initial neighbours are "     ++ show neighbours
   lock <- newLock -- write lock
-
   -- Listen to the specified port.
   serverSocket <- socket AF_INET Stream 0
   setSocketOption serverSocket ReuseAddr 1
   bind serverSocket $ portToAddress me
   listen serverSocket 1024
-
-
-  
-
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
-
   -- initialization
-  routingTabel <- newTMVarIO $ [Connection me 0 (-1)] ++ [Connection a 999 (-2)| a <- neighbours]
-  nbDistanceTable <- newTMVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
+  routingTabel    <- newTMVarIO $ [Connection me 0 (-1)] ++ [Connection a 999 (-2)| a <- neighbours]
+  nbDistanceTable <- newTMVarIO $ [Connection from 999 to | to <- neighbours, from <- neighbours]
 
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = (Node me routingTabel htabel nbDistanceTable) 
 
-  
   -- send message MyDist
   sendmydistmessage node me 0
-
 
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock node
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node lock
-
   threadDelay 1000000000
 
 readCommandLineArguments :: IO (Int, [Int])
@@ -97,8 +85,8 @@ handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTab
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
   let messagetype = head (words line)
-  let sender = (words line !! 1) 
-  let content = (((words line) \\ [messagetype]) \\ [sender])
+  let sender      = (words line !! 1) 
+  let content     = (((words line) \\ [messagetype]) \\ [sender])
   
   
   case (messagetype) of
@@ -137,10 +125,6 @@ createConnection int  = Connection int 1 int
 initalRtable :: [Int] -> Table
 initalRtable xs = map createConnection xs
 
-
-        
-   
-
 -- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
 -- addToHandleTable handletable neighbour handle = do
 -- htable <- takeTMVar handletable
@@ -148,14 +132,13 @@ initalRtable xs = map createConnection xs
 
 -- function to connect to al the neighbours 
 connection :: [Int] -> HandleTable
-connection xs = [(x, intToHandle x)|x <- xs]
+connection xs = [(x, intToHandle x) | x <- xs]
 
 intToHandle :: Int -> IO Handle
 intToHandle i = do
   client <- connectSocket i
   chandle <- socketToHandle client ReadWriteMode
   return chandle
-
 
 -- funtion to handle input
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
@@ -170,7 +153,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
       inputHandler n lock
     ("B") -> do 
       handletable' <- atomically $ readTMVar h
-      sendmessage ( lookup port handletable') ("StringMessage " ++ message)
+      sendmessage (lookup port handletable') ("StringMessage " ++ message)
       inputHandler n lock
     ("C") -> do 
       putStrLn $ "Command C"
@@ -186,22 +169,21 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
 
 -- Needs improvement       
 inputParser :: String -> (String, Int, String)
-inputParser text  | text == []        = ("", 0, "")-- the 0 is an placeholder
-                  | length split < 2  = (com, 0, "") 
-                  | length split < 3  = (com, port, "")
-                  | otherwise         = (com, port, message)
+inputParser text  | text == []       = ("", 0, "")-- the 0 is an placeholder
+                  | length split < 2 = (com, 0, "") 
+                  | length split < 3 = (com, port, "")
+                  | otherwise        = (com, port, message)
   where
-    split = words text
-    com = head split
-    port = read (split !! 1) :: Int
+    split   = words text
+    com     = head split
+    port    = read (split !! 1) :: Int
     message = last split
 
 
 -- funtion to print the routing table
 printRtable :: Int -> Table -> IO ()
-printRtable _ [] = return ()
-printRtable me table = do
-  mapM_ print table
+printRtable _ []     = return ()
+printRtable me table = mapM_ print table
 
 printHtable :: (Int,IO Handle) -> IO ()
 printHtable (i, iOHANDLE) = do
