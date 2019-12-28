@@ -18,21 +18,7 @@ import Data.List
 -- Du     :: [0..N]                Du [v] estimates d(u,v)
 -- NBu    :: [Int]  array of nodes NBU [v] is preffered neighbor of v
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
---initialization'
--- Initialization:
---     begin forall w ∈ Neighu, v ∈ V do ndisu[w, v] := N ;
---         forall v ∈ V do
---             begin Du[v] := N ; Nbu[v] := udef end ;
---         Du[u] := 0 ; Nbu[u] := local ;
---         forall w ∈ Neighu do send h mydist, u, 0 i to w
---     end
 
--- initialization :: Node -> [Int] -> STM ()
--- initialization n@(Node {nodeID = me, routingtable = r}) neighbours = do
---     let n = 1 + length neighbours
---     --ed = [DistanceTo me 0] ++ [DistanceTo a n | a <- neighbours] -- is deze nodig??
---     r <- [DConnection me 0 "local"] ++ [DConnection a n "udef"| a <- neighbours]
---     return ()
 
 
 
