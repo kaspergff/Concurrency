@@ -40,7 +40,7 @@ main = do
   
   -- initialization
   routingTabel <- newTMVarIO $ [DConnection me 0 "local"] ++ [DConnection a 999 "udef"| a <- neighbours]
-  nbDistanceTable <- newTVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
+  nbDistanceTable <- newTMVarIO $ [Connection from 999 to| to <- neighbours, from <- neighbours]
   -- send message MyDist
 
   -- handle table
@@ -92,17 +92,18 @@ handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTab
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
   let messagetype = head (words line)
-  let sender = (words line !! 1)
+  let sender = read (words line !! 1) 
   let content = (((words line) \\ [messagetype]) \\ [sender])
   
   
   case (messagetype) of
     --("Fail") -> do 
     ("Mydist") -> do
-      let v = head content
-      let d = last content
-    --   updatetable nt sender v d 
-      recompute n v  
+      let v = read (head content) :: Int 
+      let d = read (last content) :: Int
+      let s = read (sender) :: Int
+      atomically $ updateNdisUTable nt (Connection s d v) 
+      atomically $ recompute n v  
     --("Repair") -> do
     ("StringMessage") -> do 
       interlocked lock $ putStrLn (concat content)
@@ -110,15 +111,14 @@ handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTab
       interlocked lock $ putStrLn  "fakkadezewerktniet"
   hClose chandle
 
-getsender :: Handle -> HandleTable -> IO Int
-getsender _ [] = return 1000000
-getsender h ((neighbour, handle):xs) = do
-  handle' <- handle
-  if handle' == h
-    then return neighbour
-    else getsender h xs
-
   -------------------- End Template---------------------
+
+updateNdisUTable :: TMVar NeighbourDistanceTable -> Connection -> STM ()
+updateNdisUTable nt con@(Connection from dis to ) = do
+  table <- takeTMVar nt
+  let newList = filter (\(Connection from' _ to') -> to' /= to && from' /= from) table
+  putTMVar nt $ newList ++ [con]
+  return ()
 
 --hier moeten we dus nog voor zorgen dat er nog een distance berekend word en word meegegeven maar das voor later zorg
 addtotable :: (TMVar Table) -> Int -> STM ()
@@ -140,6 +140,11 @@ initalRtable xs = map createConnection xs
 -- addToHandleTable handletable neighbour handle = do
 -- htable <- takeTMVar handletable
 -- putTMVar handletable (htable ++ [(neighbour,handle)])
+
+-- sendmydistmessage :: Node -> Port -> Int -> [Port] -> IO ()
+-- sendmydistmessage n@(Node {nodeID = id, handletable = handletable}) to dist receivers = do
+--   handletable' <- handletable
+--   map flip sendmessage  ("StringMessage " ++ message) (map (lookup port handletable'))
 
 sendmessage :: Maybe (IO Handle) -> String -> IO ()
 sendmessage (Just x) message = do

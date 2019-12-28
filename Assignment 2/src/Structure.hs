@@ -17,7 +17,7 @@ data Node = Node {
     nodeID       :: Int,
     routingtable :: (TMVar Table),
     handletable  :: (TMVar HandleTable),
-    neighbourDistanceTable :: (TVar NeighbouDistanceTable)
+    neighbourDistanceTable :: (TMVar NeighbourDistanceTable)
     }  
 -- ik wil dit graag
 type Port = Int
@@ -38,4 +38,4 @@ type HandleTable = [NodeHandle]
 -- lijst met afstand tot alle bekende Nodes
 type DistanceTable = [DistanceTo] --Du
 
-type NeighbouDistanceTable = [Connection]
+type NeighbourDistanceTable  = [Connection]

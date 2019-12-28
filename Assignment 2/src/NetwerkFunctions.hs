@@ -43,7 +43,7 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
     if me == int 
         then return () -- improve
     else do
-        bn <- readTVar bnTable
+        bn <- readTMVar bnTable
         let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
         let newCon = Connection too (d+1) from
         if d + 1 < 999
@@ -58,7 +58,7 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
 --upon repair of channel
 
 -- function to get the min distance to a node from NeighbouDistanceTable
-getMinDistanceFromNBto :: NeighbouDistanceTable -> Port -> Connection
+getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> Connection
 getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port = 
     if a < b && pa == port
         then getMinDistanceFromNBto (x:xs) port
