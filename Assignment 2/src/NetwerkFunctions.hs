@@ -19,27 +19,10 @@ import Data.List
 -- NBu    :: [Int]  array of nodes NBU [v] is preffered neighbor of v
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
 
---recompute
-
-
--- Procedure Recompute (v):
---     begin if v = u
---         then begin Du[v] := 0 ; Nbu[v] := local end
---         else begin (* Estimate distance to v *)
---                 d := 1 + min{ndisu[w, v] : w ∈ Neighu} ;
---                 if d < N then
---                     begin Du[v] := d ;
---                         Nbu[v] := w with 1 + ndisu[w, v] = d
---                     end
---                 else begin Du[v] := N ; Nbu[v] := udef end
---             end ;
---         if Du[v] has changed then
---             forall x ∈ Neighu do send h mydist, v, Du[v]i to x
---     end
-
 recompute :: Node -> Port -> STM ()    
 recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
-    let oldDistance = getDistanceToPortFromRoutingTable r int -- moet dit hebben voor die laatste stap?
+    rtable <- readTMVar r
+    let oldDistance = getDistanceToPortFromRoutingTable rtable int -- moet dit hebben voor die laatste stap?
     if me == int 
         then return () -- improve
     else do
@@ -49,9 +32,9 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
         if d + 1 < 999
             then addToRoutingTable r newCon
         else addToRoutingTable r (DConnection too 999 "undef")
-    if oldDistance /= (d + 1)
-        then return()
-    else return() 
+        if oldDistance /= (d + 1)
+            then return()
+        else return() 
 
 --processing received mydist message
 --upon failure of channel
@@ -73,11 +56,10 @@ addToRoutingTable rt con@(Connection to dis via) = do
     putTMVar rt $ newList ++ [con]
     return ()
 
-getDistanceToPortFromRoutingTable :: TMVar Table -> Port -> STM(Int) 
+getDistanceToPortFromRoutingTable :: Table -> Port -> (Int) 
 getDistanceToPortFromRoutingTable rt des = do
-    table <- readTMVar rt
-    let check = find (\(Connection x _ _) -> x == des) table
+    let check = find (\(Connection x _ _) -> x == des) rt
     case check of
-        Just (Connection _ dis _) -> return dis
-        Nothing -> return (999)
+        Just (Connection _ dis _) -> dis
+        Nothing -> (999)
 
