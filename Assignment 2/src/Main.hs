@@ -3,17 +3,17 @@ module Main where
 import NetwerkFunctions
 import Structure
 
-import Control.Monad
+--import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TMVar
+--import Control.Concurrent.STM.TMVar
 import Control.Exception
-import Data.IORef
+--import Data.IORef
 import System.Environment
 import System.IO
 import Network.Socket
 import Data.List
-import Data.Tuple
+--import Data.Tuple
 
 
 main :: IO ()
@@ -25,7 +25,7 @@ main = do
   (me, neighbours) <- readCommandLineArguments
   putStrLn $ "I should be listening on port " ++ show me
   putStrLn $ "My initial neighbours are "     ++ show neighbours
-  lock <- newLock -- write lock
+  lock' <- newLock -- write lock
   -- Listen to the specified port.
   serverSocket <- socket AF_INET Stream 0
   setSocketOption serverSocket ReuseAddr 1
@@ -34,20 +34,20 @@ main = do
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
   -- initialization
-  routingTabel    <- newTMVarIO $ [Connection me 0 (-1)] ++ [Connection a 999 (-2)| a <- neighbours]
-  nbDistanceTable <- newTMVarIO $ [Connection from 999 to | to <- neighbours, from <- neighbours]
+  routingTabel    <- newTMVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
+  nbDistanceTable <- newTMVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
 
 
   -- make an instance of the node datatype which contains all info in this thread 
-  let node = (Node me routingTabel htabel nbDistanceTable) 
+  let node = Node me routingTabel htabel nbDistanceTable 
 
   -- send message MyDist
   sendmydistmessage node me 0
 
   -- Let a seperate thread listen for incomming connections
-  _ <- forkIO $ listenForConnections serverSocket lock node
+  _ <- forkIO $ listenForConnections serverSocket lock' node
   -- -- Part 2 input
-  _ <- forkIO $ inputHandler node lock
+  _ <- forkIO $ inputHandler node lock'
   threadDelay 1000000000
 
 readCommandLineArguments :: IO (Int, [Int])
@@ -73,57 +73,70 @@ connectSocket portNumber = connect'
         Right _ -> return client
 
 listenForConnections :: Socket -> Lock -> Node -> IO ()
-listenForConnections serverSocket lock node = do
-  (connection, _) <- accept serverSocket
-  _ <- forkIO $ handleConnection connection lock node
-  listenForConnections serverSocket lock node
+listenForConnections serverSocket lock' node = do
+  (connection', _) <- accept serverSocket
+  _ <- forkIO $ handleConnection connection' lock' node
+  listenForConnections serverSocket lock' node
 
 handleConnection :: Socket -> Lock -> Node -> IO ()
-handleConnection connection lock n@(Node {handletable = h , neighbourDistanceTable = nt}) = do
+handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt}) = do
   --interlocked lock $ putStrLn "// Got new incomming connection"
-  chandle <- socketToHandle connection ReadWriteMode
+  chandle <- socketToHandle connection' ReadWriteMode
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
   let messagetype = head (words line)
-  let sender      = (words line !! 1) 
-  let content     = (((words line) \\ [messagetype]) \\ [sender])
+  let sender      = words line !! 1 
+  let content     = (words line \\ [messagetype]) \\ [sender]
   
   
-  case (messagetype) of
-    --("Fail") -> do 
-    ("Mydist") -> do
+  case messagetype of
+    --"Fail" -> do 
+    "Mydist" -> do
       let v = read (head content) :: Int 
       let d = read (last content) :: Int
-      let s = read (sender) :: Int
+      let s = read sender :: Int
       atomically $ updateNdisUTable nt (Connection s d v) 
       recompute n v  
-    --("Repair") -> do
-    ("StringMessage") -> do 
-      interlocked lock $ putStrLn (concat content)
-    (_) -> do
-      interlocked lock $ putStrLn  line
+    --"Repair" -> do
+    "StringMessage" -> do
+      --sender in this context means the intended destination
+      --ik ga dit nog wel aanpassen maar doe maar ff alsof dit ok is
+      let intendedreceiver = read sender :: Int
+      let message = content 
+      if intendedreceiver == id'
+        then interlocked lock' $ putStrLn (concat content)
+        else do
+          rt' <- atomically $ readTMVar rt
+          let bestneighbour = findbestneighbour intendedreceiver rt'
+          handletable' <- atomically $ readTMVar h
+          interlocked lock' $ putStrLn $ "message for " ++ show intendedreceiver ++ " is relayed through " ++ show bestneighbour
+          --find handle of best neighbour for the destination (port) 
+          --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
+          sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
+    _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours" ++ line)
   hClose chandle
 
   -------------------- End Template---------------------
 
+  --this function is used for looking up which node is the best neighbour when going to a third node
+  --note that this results in a maybe Int since some node may be removed the lookup process
+findbestneighbour :: Int -> Table -> Int
+findbestneighbour _ [] = -10000
+findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
+                                                           | otherwise = findbestneighbour distandneighbour xs
+
 updateNdisUTable :: TMVar NeighbourDistanceTable -> Connection -> STM ()
-updateNdisUTable nt con@(Connection from dis to ) = do
+updateNdisUTable nt con@(Connection from _ to ) = do
   table <- takeTMVar nt
   let newList = filter (\(Connection from' _ to') -> to' /= to && from' /= from) table
   putTMVar nt $ newList ++ [con]
   return ()
 
---hier moeten we dus nog voor zorgen dat er nog een distance berekend word en word meegegeven maar das voor later zorg
-addtotable :: (TMVar Table) -> Int -> STM ()
-addtotable routingtable neighbour = do 
-  tabel <- takeTMVar routingtable
-  putTMVar routingtable (tabel ++  [(Connection neighbour 1 neighbour)]) 
-
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int
      
 initalRtable :: [Int] -> Table
-initalRtable xs = map createConnection xs
+initalRtable = map createConnection 
 
 -- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
 -- addToHandleTable handletable neighbour handle = do
@@ -143,34 +156,39 @@ intToHandle i = do
 -- funtion to handle input
 -- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
 inputHandler :: Node -> Lock -> IO ()
-inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock= do
+inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = do
   input <- getLine
   let (com, port, message) = inputParser input
-  case (com) of
-    ("R") -> do 
+  case com of
+    "R" -> do 
       printtabel <- atomically $ readTMVar r
-      interlocked lock $ printRtable me printtabel
-      inputHandler n lock
-    ("B") -> do 
+      interlocked lock' $ printRtable me printtabel
+      inputHandler n lock'
+    "B" -> do 
+      routingtable' <- atomically $ readTMVar r
+      --find best neighbour for the destination (port) 
+      let bestneighbour = findbestneighbour port routingtable'
       handletable' <- atomically $ readTMVar h
-      sendmessage (lookup port handletable') ("StringMessage " ++ message)
-      inputHandler n lock
-    ("C") -> do 
+      --find handle of best neighbour for the destination (port) 
+      --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
+      sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
+      inputHandler n lock'
+    "C" -> do 
       putStrLn $ "Command C"
       printtabel <- atomically $ readTMVar h
       mapM_ printHtable printtabel
-      inputHandler n lock
-    ("D") -> do 
+      inputHandler n lock'
+    "D" -> do 
       putStrLn $ "Command D"
-      inputHandler n lock
-    (_) -> do
+      inputHandler n lock'
+    _ -> do
       putStrLn $ "wrong input"
-      inputHandler n lock
+      inputHandler n lock'
 
 -- Needs improvement       
 inputParser :: String -> (String, Int, String)
-inputParser text  | text == []       = ("", 0, "")-- the 0 is an placeholder
-                  | length split < 2 = (com, 0, "") 
+inputParser []    = ("", 0, "")-- the 0 is an placeholder
+inputParser text  | length split < 2 = (com, 0, "") 
                   | length split < 3 = (com, port, "")
                   | otherwise        = (com, port, message)
   where
@@ -183,12 +201,14 @@ inputParser text  | text == []       = ("", 0, "")-- the 0 is an placeholder
 -- funtion to print the routing table
 printRtable :: Int -> Table -> IO ()
 printRtable _ []     = return ()
-printRtable me table = mapM_ print table
+printRtable _ table = mapM_ print table
 
+-- function to print handle table
+-- pls laat staan die kan nog nuttig zijn straks als ik een message moet routen
 printHtable :: (Int,IO Handle) -> IO ()
-printHtable (i, iOHANDLE) = do
-  handle <- iOHANDLE
-  print $ show i ++ show handle
+printHtable (i, iOh) = do
+  h <- iOh
+  print $ show i ++ show h
 
 newtype Lock = Lock (MVar ())
 
