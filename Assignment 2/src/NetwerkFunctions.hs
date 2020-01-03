@@ -34,10 +34,10 @@ import Data.List
 --         --putStrLn $ "DEEEBUG" ++ " Int" ++ " " ++ show int ++ " " ++ " too" ++ show too
 --         let d = _d + 1
 --         let newCon = Connection too (d) from
---         if d < 999 
+--         if d < 24 
 --             then do 
 --                 atomically $ addToRoutingTable r newCon 
---         else atomically $ addToRoutingTable r (Connection too 999 (-2))
+--         else atomically $ addToRoutingTable r (Connection too 24 (-2))
 --         if oldDistance /= d
 --             then sendmydistmessage n int d               
 --         else return() 
@@ -53,25 +53,10 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
         let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
         --putStrLn $ "DEEEBUG" ++ " Int" ++ " " ++ show int ++ " " ++ " too" ++ show too
         let d = _d + 1
-        if d < 999 
+        if d < 24 
             then addToRoutingTable r (Connection too (d) from) 
-        else addToRoutingTable r (Connection too 999 (-2))
+        else addToRoutingTable r (Connection too 24 (-2))
         return (too,d)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 --processing received mydist message
@@ -104,7 +89,7 @@ getDistanceToPortFromRoutingTable rt des = do
     let check = find (\(Connection x _ _) -> x == des) rt
     case check of
         Just (Connection _ dis _) -> dis
-        Nothing -> (999)
+        Nothing -> (24)
 
 
 

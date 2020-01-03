@@ -34,8 +34,9 @@ main = do
   -- handle table
   htabel <- newTMVarIO $ connection neighbours
   -- initialization
-  routingTabel    <- newTMVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
-  nbDistanceTable <- newTMVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
+
+  routingTabel    <- newTMVarIO $ Connection me 0 (-1) : [Connection a 24 (-2)| a <- neighbours]
+  nbDistanceTable <- newTMVarIO  [Connection from 24 to | to <- neighbours, from <- neighbours]
   --nbDistanceTable <- newTMVarIO  []
 
 
@@ -45,10 +46,11 @@ main = do
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock' node
   -- -- Part 2 input
-  _ <- forkIO $ inputHandler node lock'
-  threadDelay 8000
+  threadDelay 8000000
     -- send message MyDist
   sendmydistmessage node me 0
+
+  _ <- forkIO $ inputHandler node lock'
   threadDelay 1000000000
 
 readCommandLineArguments :: IO (Int, [Int])
@@ -92,7 +94,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
   
   case messagetype of
     --"Fail" -> do 
-    "Mydist" -> do
+    "Mydist" -> interlocked lock' $ do
       let v = read (head content) :: Int 
       let d = read (last content) :: Int
       let s = read sender :: Int
@@ -101,7 +103,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       rtable <- atomically $ readTMVar rt
       let oldDistance = getDistanceToPortFromRoutingTable rtable v
       (too, dis) <- atomically $ recompute n v
-      when (dis /= oldDistance) $ sendmydistmessage n too dis  
+      when (dis /= oldDistance) $ do 
+        sendmydistmessage n too dis
+        --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
