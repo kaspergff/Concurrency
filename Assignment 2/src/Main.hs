@@ -55,10 +55,6 @@ main = do
     -- sendstatusmessage
   sendmystatusmessage node 
 
-
-
-  
-
     -- send message MyDist
   loop' messagecount node me neighbours
  
@@ -178,6 +174,10 @@ updateNdisUTable nt con@(Connection from _ to ) = do
   return ()
 
 filterNot f = filter (not . f)
+
+
+
+
 
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int

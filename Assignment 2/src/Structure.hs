@@ -29,6 +29,10 @@ instance Show Connection where
     show (Connection a b (-2)) = show a ++ " " ++ show b ++ " " ++ "udef"
     show (Connection a b (-1)) = show a ++ " " ++ show b ++ " " ++ "local"
     show (Connection a b c)    = show a ++ " " ++ show b ++ " " ++ show c
+
+instance Eq Connection where
+    (Connection a _ b) == (Connection c _ d) = a == c && b == d 
+
 data DistanceTo = DistanceTo Port Int
 
 --tabel is een lijst van connecties
