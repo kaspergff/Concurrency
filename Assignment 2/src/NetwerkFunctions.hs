@@ -123,3 +123,10 @@ sendmessage (Just x) message = do
     hSetBuffering x' LineBuffering
     hPutStrLn x' $ id message
 sendmessage (Nothing) _ = putStrLn $ show  "error message"
+
+sendmystatusmessage n@(Node {nodeID = id, handletable = h}) = do
+    h' <- atomically $ readTMVar h
+    let receivers = map snd h'
+    let message = ("Mystatus " )
+    let justreceivers = map (\x -> (Just x)) receivers
+    mapM_ (flip sendmessage message ) justreceivers 

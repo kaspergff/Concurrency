@@ -36,20 +36,32 @@ main = do
   -- initialization
   routingTabel    <- newTMVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
   nbDistanceTable <- newTMVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
+  messagecount    <- newTMVarIO $ 0
   --nbDistanceTable <- newTMVarIO  []
 
 
   -- make an instance of the node datatype which contains all info in this thread 
-  let node = Node me routingTabel htabel nbDistanceTable 
+  let node = Node me routingTabel htabel nbDistanceTable messagecount 
+
+
+ 
+
 
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock' node
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node lock'
-  threadDelay 8000
+
+    -- sendstatusmessage
+  sendmystatusmessage node 
+
+
+
+  
+
     -- send message MyDist
-  sendmydistmessage node me 0
-  threadDelay 1000000000
+  loop' messagecount node me neighbours
+ 
 
 readCommandLineArguments :: IO (Int, [Int])
 readCommandLineArguments = do
@@ -80,7 +92,7 @@ listenForConnections serverSocket lock' node = do
   listenForConnections serverSocket lock' node
 
 handleConnection :: Socket -> Lock -> Node -> IO ()
-handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt}) = do
+handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt,messageCount = mc}) = do
   --interlocked lock $ putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection' ReadWriteMode
   -- hPutStrLn chandle "// Welcome"
@@ -91,7 +103,10 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
   
   
   case messagetype of
-    --"Fail" -> do 
+    --"Fail" -> do
+    "Mystatus" -> do
+      mc' <- atomically $ takeTMVar mc
+      atomically $ putTMVar mc (mc' + 1) 
     "Mydist" -> do
       let v = read (head content) :: Int 
       let d = read (last content) :: Int
@@ -232,3 +247,14 @@ unlock (Lock v) = putMVar v ()
 interlocked :: Lock -> IO a -> IO a
 interlocked lock_ action =
     (lock lock_ *> action) `finally` (unlock lock_)
+
+loop' :: TMVar Int -> Node -> Int -> [Int] -> IO ()
+loop' mc node me neighbours =  do
+  messagecount' <- atomically $ readTMVar mc
+  if messagecount' /=  length neighbours
+    then do
+        threadDelay 1000
+        loop' mc node me neighbours
+    else do
+       sendmydistmessage node me 0
+       threadDelay 1000000000
