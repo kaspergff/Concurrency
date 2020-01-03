@@ -2,7 +2,7 @@ module Structure where
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TMVar
+import Control.Concurrent.STM.TVar
 import Control.Exception
 import Data.IORef
 import System.Environment
@@ -14,10 +14,10 @@ import Data.List
 --vanaf nu is een node gwn lekker een node
 data Node = Node {
     nodeID       :: Int,
-    routingtable :: (TMVar Table),
-    handletable  :: (TMVar HandleTable),
-    neighbourDistanceTable :: (TMVar NeighbourDistanceTable),
-    messageCount :: (TMVar Int)
+    routingtable :: (TVar Table),
+    handletable  :: (TVar HandleTable),
+    neighbourDistanceTable :: (TVar NeighbourDistanceTable),
+    messageCount :: (TVar Int)
     }  
 -- ik wil dit graag
 type Port = Int

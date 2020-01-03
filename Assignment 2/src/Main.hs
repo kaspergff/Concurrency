@@ -6,7 +6,7 @@ import Structure
 import Control.Monad (when)
 import Control.Concurrent
 import Control.Concurrent.STM
---import Control.Concurrent.STM.TMVar
+--import Control.Concurrent.STM.TVar
 import Control.Exception
 --import Data.IORef
 import System.Environment
@@ -32,12 +32,12 @@ main = do
   bind serverSocket $ portToAddress me
   listen serverSocket 1024
   -- handle table
-  htabel <- newTMVarIO $ connection neighbours
+  htabel <- newTVarIO $ connection neighbours
   -- initialization
-  routingTabel    <- newTMVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
-  nbDistanceTable <- newTMVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
-  messagecount    <- newTMVarIO $ 0
-  --nbDistanceTable <- newTMVarIO  []
+  routingTabel    <- newTVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
+  nbDistanceTable <- newTVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
+  messagecount    <- newTVarIO $ 0
+  --nbDistanceTable <- newTVarIO  []
 
 
   -- make an instance of the node datatype which contains all info in this thread 
@@ -121,9 +121,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       if intendedreceiver == id'
         then interlocked lock' $ putStrLn (concat content)
         else do
-          rt' <- atomically $ readTMVar rt
+          rt' <- atomically $ readTVar rt
           let bestneighbour = findbestneighbour intendedreceiver rt'
-          handletable' <- atomically $ readTMVar h
+          handletable' <- atomically $ readTVar h
           interlocked lock' $ putStrLn $ "message for " ++ show intendedreceiver ++ " is relayed through " ++ show bestneighbour
           --find handle of best neighbour for the destination (port) 
           --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
@@ -139,10 +139,10 @@ processline l = do
   return (messagetype,sender,content)
 
 
-handlemystatus :: TMVar Int -> STM ()
+handlemystatus :: TVar Int -> STM ()
 handlemystatus mc = do
-  mc' <- takeTMVar mc
-  putTMVar mc (mc' + 1) 
+  mc' <- readTVar mc
+  writeTVar mc (mc' + 1) 
 
 handlemydist :: [String] -> String -> Node -> STM (Port,Int,Int)
 handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
@@ -151,7 +151,7 @@ handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable
   let s = read sender' :: Int
   updateNdisUTable nt (Connection s d v)
   --interlocked lock' $putStrLn $ " 1e " ++ show s ++ " " ++ show d ++ " " ++ show v 
-  rtable <- readTMVar rt
+  rtable <- readTVar rt
   let oldDistance = getDistanceToPortFromRoutingTable rtable v
   (too, dis) <- recompute n v
   return (too,dis,oldDistance)
@@ -170,11 +170,11 @@ findbestneighbour _ [] = -10000
 findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
                                                            | otherwise = findbestneighbour distandneighbour xs
 
-updateNdisUTable :: TMVar NeighbourDistanceTable -> Connection -> STM ()
+updateNdisUTable :: TVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
-  table <- takeTMVar nt
+  table <- readTVar nt
   let newList = filterNot (\(Connection from' _ to') -> to' == to && from' == from) table
-  putTMVar nt $ newList ++ [con]
+  writeTVar nt $ newList ++ [con]
   return ()
 
 filterNot f = filter (not . f)
@@ -185,10 +185,10 @@ createConnection int  = Connection int 1 int
 initalRtable :: [Int] -> Table
 initalRtable = map createConnection 
 
--- addToHandleTable :: (TMVar HandleTable) -> Int -> IO Handle -> STM ()
+-- addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
 -- addToHandleTable handletable neighbour handle = do
--- htable <- takeTMVar handletable
--- putTMVar handletable (htable ++ [(neighbour,handle)])
+-- htable <- takeTVar handletable
+-- writeTVar handletable (htable ++ [(neighbour,handle)])
 
 -- function to connect to all the neighbours 
 connection :: [Port] -> HandleTable
@@ -208,25 +208,25 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
   let (com, port, message) = inputParser input
   case com of
     "R" -> do 
-      printtabel <- atomically $ readTMVar r
+      printtabel <- atomically $ readTVar r
       interlocked lock' $ printRtable me printtabel
       inputHandler n lock'
     "B" -> do 
-      routingtable' <- atomically $ readTMVar r
+      routingtable' <- atomically $ readTVar r
       --find best neighbour for the destination (port) 
       let bestneighbour = findbestneighbour port routingtable'
-      handletable' <- atomically $ readTMVar h
+      handletable' <- atomically $ readTVar h
       --find handle of best neighbour for the destination (port) 
       --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
       sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
       inputHandler n lock'
     "C" -> do 
       putStrLn $ "Command C"
-      printtabel <- atomically $ readTMVar h
+      printtabel <- atomically $ readTVar h
       mapM_ printHtable printtabel
       inputHandler n lock'
     "D" -> do 
-      printtabel <- atomically $ readTMVar (neighbourDistanceTable n)
+      printtabel <- atomically $ readTVar (neighbourDistanceTable n)
       interlocked lock' $ printRtable me printtabel
       inputHandler n lock'
     _ -> do
@@ -273,9 +273,9 @@ interlocked :: Lock -> IO a -> IO a
 interlocked lock_ action =
     (lock lock_ *> action) `finally` (unlock lock_)
 
-loop' :: TMVar Int -> Node -> Int -> [Int] -> IO ()
+loop' :: TVar Int -> Node -> Int -> [Int] -> IO ()
 loop' mc node me neighbours =  do
-  messagecount' <- atomically $ readTMVar mc
+  messagecount' <- atomically $ readTVar mc
   if messagecount' /=  length neighbours
     then do
         threadDelay 10

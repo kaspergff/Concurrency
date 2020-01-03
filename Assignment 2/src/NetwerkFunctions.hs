@@ -5,7 +5,7 @@ import Structure
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TMVar
+import Control.Concurrent.STM.TVar
 import Control.Exception
 import Data.IORef
 import System.Environment
@@ -21,7 +21,7 @@ import Data.List
     
 -- recompute :: Node -> Port -> IO ()    
 -- recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
---     rtable <- atomically $ readTMVar r
+--     rtable <- atomically $ readTVar r
 --     let oldDistance = getDistanceToPortFromRoutingTable rtable int -- moet dit hebben voor die laatste stap?\
 --     --putStrLn $ "mee " ++ show me ++ " " ++ show int
 --     if me == int 
@@ -29,7 +29,7 @@ import Data.List
 --             atomically $ addToRoutingTable r (Connection int 0 (-1))
 --             --sendmydistmessage n int 0 
 --     else do
---         bn <- atomically $ readTMVar bnTable
+--         bn <- atomically $ readTVar bnTable
 --         let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
 --         --putStrLn $ "DEEEBUG" ++ " Int" ++ " " ++ show int ++ " " ++ " too" ++ show too
 --         let d = _d + 1
@@ -49,7 +49,7 @@ recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTab
             addToRoutingTable r (Connection int 0 (-1))
             return (me,0)
     else do
-        bn <- readTMVar bnTable
+        bn <- readTVar bnTable
         let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
         --putStrLn $ "DEEEBUG" ++ " Int" ++ " " ++ show int ++ " " ++ " too" ++ show too
         let d = _d + 1
@@ -73,14 +73,14 @@ getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port =
 
 
 --function to add a connection to the routing table
-addToRoutingTable :: TMVar Table -> Connection -> STM ()
+addToRoutingTable :: TVar Table -> Connection -> STM ()
 addToRoutingTable rt con@(Connection to _ _) = do
-    table <- takeTMVar rt
+    table <- readTVar rt
     if (length table) < 1
-        then putTMVar rt $ table ++ [con]
+        then writeTVar rt $ table ++ [con]
     else do
         let newList = filter (\(Connection x _ _) -> x /= to) table
-        putTMVar rt $ newList ++ [con]
+        writeTVar rt $ newList ++ [con]
         return ()
 
 
@@ -96,7 +96,7 @@ getDistanceToPortFromRoutingTable rt des = do
 --sendmydistmessage :: Node -> Port -> Int ->  [IO ()]
 --sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
 sendmydistmessage n@(Node {nodeID = id, handletable = h}) to dist = do
-    h' <- atomically $ readTMVar h
+    h' <- atomically $ readTVar h
     let receivers = map snd h'
     let message = ("Mydist " ++ show id ++ " " ++ show to ++ " " ++ show dist)
     let justreceivers = map (\x -> (Just x)) receivers
@@ -111,7 +111,7 @@ sendmessage (Nothing) _ = putStrLn $ show  "error message"
 
 
 sendmystatusmessage n@(Node {nodeID = id, handletable = h}) = do
-    h' <- atomically $ readTMVar h
+    h' <- atomically $ readTVar h
     let receivers = map snd h'
     let message = ("Mystatus " )
     let justreceivers = map (\x -> (Just x)) receivers
