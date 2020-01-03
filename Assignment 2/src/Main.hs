@@ -3,7 +3,7 @@ module Main where
 import NetwerkFunctions
 import Structure
 
---import Control.Monad
+import Control.Monad (when)
 import Control.Concurrent
 import Control.Concurrent.STM
 --import Control.Concurrent.STM.TMVar
@@ -36,20 +36,19 @@ main = do
   -- initialization
   routingTabel    <- newTMVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
   nbDistanceTable <- newTMVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
+  --nbDistanceTable <- newTMVarIO  []
 
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable 
 
-
-
-  -- send message MyDist
-  sendmydistmessage node me 0
-
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock' node
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node lock'
+  threadDelay 8000
+    -- send message MyDist
+  sendmydistmessage node me 0
   threadDelay 1000000000
 
 readCommandLineArguments :: IO (Int, [Int])
@@ -97,8 +96,12 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       let v = read (head content) :: Int 
       let d = read (last content) :: Int
       let s = read sender :: Int
-      atomically $ updateNdisUTable nt (Connection s d v) 
-      recompute n v
+      atomically $ updateNdisUTable nt (Connection s d v)
+      --interlocked lock' $putStrLn $ " 1e " ++ show s ++ " " ++ show d ++ " " ++ show v 
+      rtable <- atomically $ readTMVar rt
+      let oldDistance = getDistanceToPortFromRoutingTable rtable v
+      (too, dis) <- atomically $ recompute n v
+      when (dis /= oldDistance) $ sendmydistmessage n too dis  
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
@@ -130,9 +133,11 @@ findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour ==
 updateNdisUTable :: TMVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
   table <- takeTMVar nt
-  let newList = filter (\(Connection from' _ to') -> to' /= to && from' /= from) table
+  let newList = filterNot (\(Connection from' _ to') -> to' == to && from' == from) table
   putTMVar nt $ newList ++ [con]
   return ()
+
+filterNot f = filter (not . f)
 
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int
@@ -181,7 +186,8 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       mapM_ printHtable printtabel
       inputHandler n lock'
     "D" -> do 
-      putStrLn $ "Command D"
+      printtabel <- atomically $ readTMVar (neighbourDistanceTable n)
+      interlocked lock' $ printRtable me printtabel
       inputHandler n lock'
     _ -> do
       putStrLn $ "wrong input"
