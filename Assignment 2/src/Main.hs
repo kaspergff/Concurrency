@@ -41,6 +41,8 @@ main = do
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable 
 
+
+
   -- send message MyDist
   sendmydistmessage node me 0
 
@@ -96,7 +98,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       let d = read (last content) :: Int
       let s = read sender :: Int
       atomically $ updateNdisUTable nt (Connection s d v) 
-      recompute n v  
+      recompute n v
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
@@ -120,7 +122,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
 
   --this function is used for looking up which node is the best neighbour when going to a third node
   --note that this results in a maybe Int since some node may be removed the lookup process
-findbestneighbour :: Int -> Table -> Int
+findbestneighbour :: Port -> Table -> Port
 findbestneighbour _ [] = -10000
 findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
                                                            | otherwise = findbestneighbour distandneighbour xs
@@ -143,11 +145,11 @@ initalRtable = map createConnection
 -- htable <- takeTMVar handletable
 -- putTMVar handletable (htable ++ [(neighbour,handle)])
 
--- function to connect to al the neighbours 
-connection :: [Int] -> HandleTable
+-- function to connect to all the neighbours 
+connection :: [Port] -> HandleTable
 connection xs = [(x, intToHandle x) | x <- xs]
 
-intToHandle :: Int -> IO Handle
+intToHandle :: Port -> IO Handle
 intToHandle i = do
   client <- connectSocket i
   chandle <- socketToHandle client ReadWriteMode
