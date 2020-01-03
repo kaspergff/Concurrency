@@ -55,10 +55,6 @@ main = do
     -- sendstatusmessage
   sendmystatusmessage node 
 
-
-
-  
-
     -- send message MyDist
   loop' messagecount node me neighbours
  
@@ -150,11 +146,16 @@ findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour ==
 updateNdisUTable :: TMVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
   table <- takeTMVar nt
-  let newList = filterNot (\(Connection from' _ to') -> to' == to && from' == from) table
+  --let newList = filterNot (\(Connection from' _ to') -> to' == to && from' == from) table
+  let newList = deleteFirst con table
   putTMVar nt $ newList ++ [con]
   return ()
 
 filterNot f = filter (not . f)
+
+
+
+
 
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int
@@ -255,7 +256,7 @@ loop' mc node me neighbours =  do
   messagecount' <- atomically $ readTMVar mc
   if messagecount' /=  length neighbours
     then do
-        threadDelay 1000
+        threadDelay 10
         loop' mc node me neighbours
     else do
        sendmydistmessage node me 0

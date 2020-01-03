@@ -116,3 +116,8 @@ sendmystatusmessage n@(Node {nodeID = id, handletable = h}) = do
     let message = ("Mystatus " )
     let justreceivers = map (\x -> (Just x)) receivers
     mapM_ (flip sendmessage message ) justreceivers 
+
+deleteFirst :: (Eq a) => a -> [a] -> [a]
+deleteFirst _ [] = [] 
+deleteFirst a (b:bc) | a == b    = bc 
+                     | otherwise = b : deleteFirst a bc
