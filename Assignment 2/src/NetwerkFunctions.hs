@@ -124,6 +124,7 @@ sendmessage (Just x) message = do
     hPutStrLn x' $ id message
 sendmessage (Nothing) _ = putStrLn $ show  "error message"
 
+
 sendmystatusmessage n@(Node {nodeID = id, handletable = h}) = do
     h' <- atomically $ readTMVar h
     let receivers = map snd h'
