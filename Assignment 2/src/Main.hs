@@ -93,28 +93,21 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
   chandle <- socketToHandle connection' ReadWriteMode
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
-  let messagetype = head (words line)
-  let sender      = words line !! 1 
-  let content     = (words line \\ [messagetype]) \\ [sender]
+
+  (messagetype,sender,content)  <- atomically $ processline line 
+  
   
   
   case messagetype of
     --"Fail" -> do
-    "Mystatus" -> do
-      mc' <- atomically $ takeTMVar mc
-      atomically $ putTMVar mc (mc' + 1) 
+    "Mystatus" ->  do
+      atomically $ handlemystatus mc
+     
     "Mydist" -> do
-      let v = read (head content) :: Int 
-      let d = read (last content) :: Int
-      let s = read sender :: Int
-      atomically $ updateNdisUTable nt (Connection s d v)
-      --interlocked lock' $putStrLn $ " 1e " ++ show s ++ " " ++ show d ++ " " ++ show v 
-      rtable <- atomically $ readTMVar rt
-      let oldDistance = getDistanceToPortFromRoutingTable rtable v
-      (too, dis) <- atomically $ recompute n v
-      when (dis /= oldDistance) $ do 
-        sendmydistmessage n too dis
-        --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
+      (too,dis,oldDistance) <- atomically $ handlemydist content sender n
+      when (dis /= oldDistance) $ sendmydistmessage n too dis
+      return ()
+      
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
@@ -133,6 +126,36 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
           sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
     _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours" ++ line)
   hClose chandle
+
+processline :: String -> STM (String,String,[String])
+processline l = do
+  let messagetype = head (words l)
+  let sender      = words l !! 1 
+  let content     = (words l \\ [messagetype]) \\ [sender]
+  return (messagetype,sender,content)
+
+
+handlemystatus :: TMVar Int -> STM ()
+handlemystatus mc = do
+  mc' <- takeTMVar mc
+  putTMVar mc (mc' + 1) 
+
+handlemydist :: [String] -> String -> Node -> STM (Port,Int,Int)
+handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
+  let v = read (head content') :: Int 
+  let d = read (last content') :: Int
+  let s = read sender' :: Int
+  updateNdisUTable nt (Connection s d v)
+  --interlocked lock' $putStrLn $ " 1e " ++ show s ++ " " ++ show d ++ " " ++ show v 
+  rtable <- readTMVar rt
+  let oldDistance = getDistanceToPortFromRoutingTable rtable v
+  (too, dis) <- recompute n v
+  return (too,dis,oldDistance)
+ 
+        --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
+
+
+
 
   -------------------- End Template---------------------
 
