@@ -35,7 +35,4 @@ type Table       = [Connection]
 type NodeHandle  = (Int,IO Handle)
 type HandleTable = [NodeHandle]
 
--- lijst met afstand tot alle bekende Nodes
-type DistanceTable = [DistanceTo] --Du
-
 type NeighbourDistanceTable = [Connection]

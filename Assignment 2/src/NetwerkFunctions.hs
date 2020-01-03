@@ -19,24 +19,60 @@ import Data.List
 -- NBu    :: [Int]  array of nodes NBU [v] is preffered neighbor of v
 -- Ndisu  :: [0..N]                Ndisu[w,v] estimates d(w.v)
     
-recompute :: Node -> Port -> IO ()    
+-- recompute :: Node -> Port -> IO ()    
+-- recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
+--     rtable <- atomically $ readTMVar r
+--     let oldDistance = getDistanceToPortFromRoutingTable rtable int -- moet dit hebben voor die laatste stap?\
+--     --putStrLn $ "mee " ++ show me ++ " " ++ show int
+--     if me == int 
+--         then do
+--             atomically $ addToRoutingTable r (Connection int 0 (-1))
+--             --sendmydistmessage n int 0 
+--     else do
+--         bn <- atomically $ readTMVar bnTable
+--         let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
+--         --putStrLn $ "DEEEBUG" ++ " Int" ++ " " ++ show int ++ " " ++ " too" ++ show too
+--         let d = _d + 1
+--         let newCon = Connection too (d) from
+--         if d < 999 
+--             then do 
+--                 atomically $ addToRoutingTable r newCon 
+--         else atomically $ addToRoutingTable r (Connection too 999 (-2))
+--         if oldDistance /= d
+--             then sendmydistmessage n int d               
+--         else return() 
+
+recompute :: Node -> Port -> STM (Port,Int)    
 recompute n@(Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
-    rtable <- atomically $ readTMVar r
-    let oldDistance = getDistanceToPortFromRoutingTable rtable int -- moet dit hebben voor die laatste stap?
     if me == int 
-        then atomically $ addToRoutingTable r (Connection int 0 (-1))
+        then do
+            addToRoutingTable r (Connection int 0 (-1))
+            return (me,0)
     else do
-        bn <- atomically $ readTMVar bnTable
-        let (Connection from d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
-        let newCon = Connection too (d+1) from
-        if d + 1 < 999
-            then do 
-                atomically $ addToRoutingTable r newCon
-                --sendmydistmessage n int (d+1) 
-        else atomically $ addToRoutingTable r (Connection too 999 (-2))
-        if oldDistance /= (d + 1)
-            then sendmydistmessage n int (d+1)               
-        else return() 
+        bn <- readTMVar bnTable
+        let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
+        --putStrLn $ "DEEEBUG" ++ " Int" ++ " " ++ show int ++ " " ++ " too" ++ show too
+        let d = _d + 1
+        if d < 999 
+            then addToRoutingTable r (Connection too (d) from) 
+        else addToRoutingTable r (Connection too 999 (-2))
+        return (too,d)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 --processing received mydist message
 --upon failure of channel
