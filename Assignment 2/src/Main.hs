@@ -34,10 +34,9 @@ main = do
   -- handle table
   htabel <- newTVarIO $ connection neighbours
   -- initialization
-  routingTabel    <- newTVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
-  nbDistanceTable <- newTVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
+  routingTabel    <- newTVarIO $ [Connection me 0 (-1)]
   messagecount    <- newTVarIO $ 0
-  --nbDistanceTable <- newTVarIO  []
+  nbDistanceTable <- newTVarIO  []
 
 
   -- make an instance of the node datatype which contains all info in this thread 
@@ -104,8 +103,11 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       atomically $ handlemystatus mc
      
     "Mydist" -> do
-      (too,dis,oldDistance) <- atomically $ handlemydist content sender n
-      when (dis /= oldDistance) $ sendmydistmessage n too dis
+      (too,via,dis,oldDistance) <- atomically $ handlemydist content sender n
+      when (dis /= oldDistance) $ do 
+        sendmydistmessage n too dis
+        interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+      --sendmydistmessage n too dis
       return ()
       
     --"Repair" -> do
@@ -140,7 +142,7 @@ handlemystatus mc = do
   mc' <- readTVar mc
   writeTVar mc (mc' + 1) 
 
-handlemydist :: [String] -> String -> Node -> STM (Port,Int,Int)
+handlemydist :: [String] -> String -> Node -> STM (Port,Port,Int,Int)
 handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
   let v = read (head content') :: Int 
   let d = read (last content') :: Int
@@ -150,7 +152,7 @@ handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable
   rtable <- readTVar rt
   let oldDistance = getDistanceToPortFromRoutingTable rtable v
   (too, dis) <- recompute n v
-  return (too,dis,oldDistance)
+  return (too,s,dis,oldDistance)
  
         --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
 
