@@ -96,18 +96,22 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       atomically $ handlemystatus mc
      
     "Mydist" -> do
+      -- h' <- atomically $ readTVar h
+      -- mc' <- atomically $ readTVar mc
+      -- when (mc' == length h' && length h' > 1 && mc' > 1) $ do
       (too,via,dis,oldDistance) <- atomically $ handlemydist content sender n
       when (dis /= oldDistance) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
-      --sendmydistmessage n too dis
-      return ()
-      --hier moet nog wat routine bij bedacht worden zoals wanneer toevoegen aan rt?
+        --sendmydistmessage n too dis
+      -- return ()
+        --hier moet nog wat routine bij bedacht worden zoals wanneer toevoegen aan rt?
     "ConnectRequest" -> do
       let intendedconnection = read sender :: Int
       let handle = intToHandle intendedconnection
       h' <- atomically $ readTVar h
       atomically $ writeTVar h (h' ++ [(intendedconnection,handle)])
+      interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
@@ -218,6 +222,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       h' <- atomically $ readTVar h
       atomically $ writeTVar h (h' ++ [(port,handle)])
       sendmessage (Just handle) ("ConnectRequest " ++ show me)
+      interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
       inputHandler n lock'
     "D" -> do 
       printtabel <- atomically $ readTVar (neighbourDistanceTable n)
@@ -272,7 +277,7 @@ loop' mc node me neighbours =  do
   messagecount' <- atomically $ readTVar mc
   if messagecount' /=  length neighbours
     then do
-        threadDelay 10
+        threadDelay 1500000
         loop' mc node me neighbours
     else do
        sendmydistmessage node me 0
