@@ -37,15 +37,9 @@ main = do
   routingTabel    <- newTVarIO $ Connection me 0 (-1) : [Connection a 999 (-2)| a <- neighbours]
   nbDistanceTable <- newTVarIO  [Connection from 999 to | to <- neighbours, from <- neighbours]
   messagecount    <- newTVarIO $ 0
-  --nbDistanceTable <- newTVarIO  []
-
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable messagecount 
-
-
- 
-
 
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock' node
@@ -95,9 +89,6 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
   line <- hGetLine chandle
 
   (messagetype,sender,content)  <- atomically $ processline line 
-  
-  
-  
   case messagetype of
     --"Fail" -> do
     "Mystatus" ->  do
@@ -107,7 +98,19 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       (too,dis,oldDistance) <- atomically $ handlemydist content sender n
       when (dis /= oldDistance) $ sendmydistmessage n too dis
       return ()
-      
+    "ConnectRequest" -> do
+      let intendedconnection = read sender :: Int
+      let handle = intToHandle intendedconnection
+      h' <- atomically $ readTVar h
+      atomically $ writeTVar h (h' ++ [(intendedconnection,handle)])
+    -- --   h' <- atomically $ readTVar h
+    -- --   atomically $ writeTVar h (h' ++ [(sender, concat content)])
+    --   let intendedreceiver = read sender :: Int
+    --   let adress = connectSocket intendedreceiver
+    --   adress' <- adress
+    --   let handle' = socketToHandle adress' ReadWriteMode
+    --   h' <- atomically $ readTVar h
+    --   atomically $ writeTVar h (h' ++ [(intendedreceiver,handle')])
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
@@ -129,10 +132,10 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
 
 processline :: String -> STM (String,String,[String])
 processline l = do
-  let messagetype = head (words l)
-  let sender      = words l !! 1 
-  let content     = (words l \\ [messagetype]) \\ [sender]
-  return (messagetype,sender,content)
+  let messagetype' = head (words l)
+  let sender'      = words l !! 1 
+  let content'     = (words l \\ [messagetype']) \\ [sender']
+  return (messagetype',sender',content')
 
 
 handlemystatus :: TVar Int -> STM ()
@@ -154,9 +157,6 @@ handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable
  
         --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
 
-
-
-
   -------------------- End Template---------------------
 
   --this function is used for looking up which node is the best neighbour when going to a third node
@@ -174,10 +174,6 @@ updateNdisUTable nt con@(Connection from _ to ) = do
   return ()
 
 filterNot f = filter (not . f)
-
-
-
-
 
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int
@@ -221,9 +217,10 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
       inputHandler n lock'
     "C" -> do 
-      putStrLn $ "Command C"
-      printtabel <- atomically $ readTVar h
-      mapM_ printHtable printtabel
+      let handle = intToHandle port
+      h' <- atomically $ readTVar h
+      atomically $ writeTVar h (h' ++ [(port,handle)])
+      sendmessage (Just handle) ("ConnectRequest " ++ show me)
       inputHandler n lock'
     "D" -> do 
       printtabel <- atomically $ readTVar (neighbourDistanceTable n)
