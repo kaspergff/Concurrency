@@ -116,7 +116,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       rtable <- atomically $ readTMVar rt
       let oldDistance = getDistanceToPortFromRoutingTable rtable v
       (too, dis) <- atomically $ recompute n v
-      when (dis /= oldDistance) $ sendmydistmessage n too dis  
+      when (dis /= oldDistance) $ do 
+        sendmydistmessage n too dis
+        --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
