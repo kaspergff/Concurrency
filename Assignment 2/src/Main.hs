@@ -102,19 +102,12 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
       --sendmydistmessage n too dis
       return ()
+      --hier moet nog wat routine bij bedacht worden zoals wanneer toevoegen aan rt?
     "ConnectRequest" -> do
       let intendedconnection = read sender :: Int
       let handle = intToHandle intendedconnection
       h' <- atomically $ readTVar h
       atomically $ writeTVar h (h' ++ [(intendedconnection,handle)])
-    -- --   h' <- atomically $ readTVar h
-    -- --   atomically $ writeTVar h (h' ++ [(sender, concat content)])
-    --   let intendedreceiver = read sender :: Int
-    --   let adress = connectSocket intendedreceiver
-    --   adress' <- adress
-    --   let handle' = socketToHandle adress' ReadWriteMode
-    --   h' <- atomically $ readTVar h
-    --   atomically $ writeTVar h (h' ++ [(intendedreceiver,handle')])
     --"Repair" -> do
     "StringMessage" -> do
       --sender in this context means the intended destination
