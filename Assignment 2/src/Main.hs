@@ -36,7 +36,7 @@ main = do
   -- initialization
   routingTabel    <- newTVarIO $ [Connection me 0 (-1)]
   messagecount    <- newTVarIO $ 0
-  nbDistanceTable <- newTVarIO  []
+  nbDistanceTable <- newTVarIO $ []
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable messagecount 
@@ -95,7 +95,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "Mydist" -> do
 
       (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
-      when (dis /= oldDistance) $ do 
+      when (dis /= oldDistance && dis < 24) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
 
@@ -167,13 +167,14 @@ updateNdisUTable nt con@(Connection from _ to ) = do
   writeTVar nt $ newList ++ [con]
   return ()
 
+filterNot :: (a -> Bool) -> [a] -> [a]
 filterNot f = filter (not . f)
 
-createConnection :: Int -> Connection
-createConnection int  = Connection int 1 int
+-- createConnection :: Int -> Connection
+-- createConnection int  = Connection int 1 int
      
-initalRtable :: [Int] -> Table
-initalRtable = map createConnection 
+-- initalRtable :: [Int] -> Table
+-- initalRtable = map createConnection 
 
 addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
 addToHandleTable handletable neighbour handle = do
@@ -182,7 +183,7 @@ addToHandleTable handletable neighbour handle = do
 
 -- function to connect to all the neighbours 
 connection :: [Port] -> HandleTable
-connection xs = [(x, intToHandle x) | x <- xs]
+connection = zip <*> map intToHandle
 
 intToHandle :: Port -> IO Handle
 intToHandle i = do
