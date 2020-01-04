@@ -106,9 +106,15 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
         then interlocked lock' $ putStrLn (concat content)
         else sendToNextNode lock' h rt message intendedreceiver
     "DisConnectRequest" -> do
-      --remove from handlelist, zoek tegelijk de handle op
+      --remove from handlelist
+      let intendedreceiver = read port :: Int
+      handletable' <- atomically $ readTVar h
+      let handle = (lookup intendedreceiver handletable')
+      atomically $ removeFromHandleTable h intendedreceiver
       --close channel
       --perform recompute
+      
+      interlocked lock' $ putStrLn $ "Disconnected" ++ show intendedreceiver
     _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours, also no action is taken" ++ line)
   hClose chandle
 
@@ -310,7 +316,7 @@ repair n port lock= do
       forM_ routingtable' $ \(Connection too dis _) -> do
           sendmydistmessage n too dis
 
-fail' :: Node -> Port -> Lock -> Handle -> IO()
+fail' :: Node -> Port -> Lock -> Maybe (IO Handle)-> IO()
 fail' n@(Node {handletable = h}) port lock' handle = do
   atomically $ removeFromHandleTable h port 
   --doe algoritme dingen
