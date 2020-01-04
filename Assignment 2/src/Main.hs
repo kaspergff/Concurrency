@@ -276,7 +276,8 @@ loop' mc node me neighbours =  do
         loop' mc node me neighbours
     else do
        sendmydistmessage node me 0
-       threadDelay 4000000
+       threadDelay 3000000
        sendmydistmessage node me 0
        threadDelay 1000000000000
+       sendmydistmessage node me 0
 
