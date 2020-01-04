@@ -74,7 +74,6 @@ listenForConnections serverSocket lock' node = do
   _ <- forkIO $ handleConnection connection' lock' node
   listenForConnections serverSocket lock' node
 
-
 --this function is used for performing different actions for different types of incomming messages
 handleConnection :: Socket -> Lock -> Node -> IO ()
 handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt,messageCount = mc}) = do
@@ -87,7 +86,6 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "Mystatus" ->  do
       atomically $ handlemystatus mc
     "Mydist" -> do
-
       (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
       when (dis /= oldDistance && dis <= 24) $ do 
         sendmydistmessage n too dis
@@ -166,15 +164,6 @@ updateNdisUTable nt con@(Connection from _ to ) = do
   let newList = filter ( not.(\(Connection from' _ to') -> to' == to && from' == from)) table
   writeTVar nt $ newList ++ [con]
   return ()
-
-filterNot :: (a -> Bool) -> [a] -> [a]
-filterNot f = filter (not . f)
-
--- createConnection :: Int -> Connection
--- createConnection int  = Connection int 1 int
-     
--- initalRtable :: [Int] -> Table
--- initalRtable = map createConnection 
 
 --function for adding a single entry of the (Int, IO Handle) type to the handle table
 addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
