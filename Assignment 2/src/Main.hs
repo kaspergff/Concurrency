@@ -333,10 +333,6 @@ fail' :: Node -> Port -> Lock -> Maybe (IO Handle)-> IO()
 fail' _ _ _ (Nothing) = return ()
 fail' n@(Node {handletable = h}) port lock' (Just handle) = do
   atomically $ removeFromHandleTable h port
-  handle' <- handle 
-  hClose handle'
-  --doe algoritme dingen
-  --doe hclose met doosje handle
 
   -- remove the node as neigbour == set distance in routingtable to 24
   ndisu <- atomically $ readTVar (routingtable n)
