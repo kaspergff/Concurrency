@@ -97,6 +97,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
+      sendmydistmessage n intendedconnection 1
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
