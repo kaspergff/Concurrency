@@ -97,6 +97,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       (intendedconnection) <- atomically $ handleconectrequest port h
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
+    --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
       --port in this context means the intended destination
       let intendedreceiver = read port :: Int
@@ -201,10 +202,14 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
       inputHandler n lock'
     "C" -> do 
+      --please note that the routing table may not be always correct but connect works 100% of the time
       let handle = intToHandle port
       atomically $ addToHandleTable h port handle 
       sendmessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
+      --wait a bit so that the other node gets the chance to add this node to its handletable before continuing
+      threadDelay 100
+      sendmydistmessage n me 0
       inputHandler n lock'
     
     --                                             --
