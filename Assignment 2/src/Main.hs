@@ -97,9 +97,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h nt
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
-      -- send mydist message to yourself to start recompute
+      threadDelay 100
+      sendmydistmessage n id' 0
       
-
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
@@ -169,7 +169,7 @@ updateNdisUTable :: TVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
   table <- readTVar nt
   let newList = filter ( not.(\(Connection from' _ to') -> to' == to && from' == from)) table
-  writeTVar nt $ newList ++ [con]
+  writeTVar nt $ [con] ++ newList
   return ()
 
 --function for adding a single entry of the (Int, IO Handle) type to the handle table
