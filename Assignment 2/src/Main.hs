@@ -97,8 +97,11 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h nt
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
-      threadDelay 100
-      sendmydistmessage n id' 0
+      -- threadDelay 100
+      -- sendmydistmessage n id' 0
+      -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+      threadDelay 1000
+      repair n intendedconnection lock'
       
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
@@ -214,9 +217,13 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       sendmessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
       --wait a bit so that the other node gets the chance to add this node to its handletable before continuing
-      threadDelay 100
-      sendmydistmessage n me 0
-      inputHandler n lock'
+      threadDelay 1000
+      repair n port lock'
+
+
+      -- threadDelay 1000
+      -- sendmydistmessage n me 0
+      -- inputHandler n lock'
     
     --                                             --
     --                                             --
@@ -286,3 +293,16 @@ loop' mc node me neighbours =  do
        threadDelay 1000000000000
        sendmydistmessage node me 0
 
+repair :: Node -> Port -> Lock -> IO()
+repair n port lock= do
+    -- ndisu[w, v] := N ;
+    -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+    -- let newNdisu = []
+    -- atomically $ writeTVar (neighbourDistanceTable n) newNdisu
+    -- add new item to routingtable
+    atomically $ addToRoutingTable (routingtable n) (Connection port 1 port)
+    routingtable' <- atomically $ readTVar (routingtable n)
+    -- denk dat t t beste is als dit interlocked gebeurt
+    interlocked lock $ do
+      forM_ routingtable' $ \(Connection too dis _) -> do
+          sendmydistmessage n too dis
