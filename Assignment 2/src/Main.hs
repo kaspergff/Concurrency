@@ -87,7 +87,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       atomically $ handlemystatus mc
     "Mydist" -> do
       (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
-      when (dis /= oldDistance) $ do 
+      when (dis /= oldDistance && dis < 24) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
@@ -164,6 +164,15 @@ updateNdisUTable nt con@(Connection from _ to ) = do
   writeTVar nt $ newList ++ [con]
   return ()
 
+filterNot :: (a -> Bool) -> [a] -> [a]
+filterNot f = filter (not . f)
+
+-- createConnection :: Int -> Connection
+-- createConnection int  = Connection int 1 int
+     
+-- initalRtable :: [Int] -> Table
+-- initalRtable = map createConnection 
+
 --function for adding a single entry of the (Int, IO Handle) type to the handle table
 addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
 addToHandleTable handletable neighbour handle = do
@@ -172,7 +181,7 @@ addToHandleTable handletable neighbour handle = do
 
 -- function to connect to all the neighbours 
 connection :: [Port] -> HandleTable
-connection xs = [(x, intToHandle x) | x <- xs]
+connection = zip <*> map intToHandle
 
 intToHandle :: Port -> IO Handle
 intToHandle i = do
