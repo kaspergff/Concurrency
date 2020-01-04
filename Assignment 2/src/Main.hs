@@ -96,7 +96,6 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       (intendedconnection) <- atomically $ handleconectrequest port h nt
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
       repair n intendedconnection lock'
-      
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
@@ -106,6 +105,10 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       if intendedreceiver == id'
         then interlocked lock' $ putStrLn (concat content)
         else sendToNextNode lock' h rt message intendedreceiver
+    "DisConnectRequest" -> do
+      --remove from handlelist, zoek tegelijk de handle op
+      --close channel
+      --perform recompute
     _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours, also no action is taken" ++ line)
   hClose chandle
 
@@ -178,6 +181,13 @@ addToHandleTable handletable neighbour handle = do
   htable <- readTVar handletable
   writeTVar handletable (htable ++ [(neighbour,handle)])
 
+removeFromHandleTable :: (TVar HandleTable) -> Int -> STM()
+removeFromHandleTable handletable neighbour = do
+  htable <- readTVar handletable
+  let newlist = filter (not.(\(x,_) -> x == neighbour)) htable
+  writeTVar handletable newlist
+
+
 -- function to connect to all the neighbours 
 connection :: [Port] -> HandleTable
 connection = zip <*> map intToHandle
@@ -214,7 +224,12 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
       repair n port lock'
 
-    
+    "D" -> do
+      handletable' <- atomically $ readTVar h
+      let handle = (lookup port handletable')
+      sendmessage handle ("DisConnectRequest " ++ show me)
+      interlocked lock' $ putStrLn $ ("Disconnected: " ++ show port)
+      fail' n port lock' handle
     --                                             --
     --                                             --
     -- E is debug dus verwijder voor de eindversie --
@@ -294,3 +309,11 @@ repair n port lock= do
     interlocked lock $ do
       forM_ routingtable' $ \(Connection too dis _) -> do
           sendmydistmessage n too dis
+
+fail' :: Node -> Port -> Lock -> Handle -> IO()
+fail' n@(Node {handletable = h}) port lock' handle = do
+  atomically $ removeFromHandleTable h port 
+  --doe algoritme dingen
+  --doe hclose met doosje handle
+ 
+

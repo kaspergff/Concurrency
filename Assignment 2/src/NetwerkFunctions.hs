@@ -22,13 +22,6 @@ recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable
         return (too,d)
 
 
--- function to get the min distance to a node from NeighbouDistanceTable
--- getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> Connection
--- getMinDistanceFromNBto [x] _ = x
--- getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port = 
---     if a < b && pa == port
---         then getMinDistanceFromNBto (x:xs) port
---         else getMinDistanceFromNBto (y:xs) port
 getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> STM (Connection)
 getMinDistanceFromNBto tb p = do
     let filterList = filter (\(Connection _ _ t)-> t == p) tb
@@ -79,8 +72,6 @@ sendmessage (Just x) message = do
     hPutStrLn x' $ id message
 sendmessage (Nothing) _ = putStrLn $ show  "error message"
 
-
-
 sendmystatusmessage (Node {handletable = h,nodeID = id'}) = do
     h' <- atomically $ readTVar h
     let receivers = map snd h'
@@ -88,7 +79,4 @@ sendmystatusmessage (Node {handletable = h,nodeID = id'}) = do
     let justreceivers = map (\x -> (Just x)) receivers
     mapM_ (flip sendmessage message ) justreceivers 
 
-deleteFirst :: (Eq a) => a -> [a] -> [a]
-deleteFirst _ [] = [] 
-deleteFirst a (b:bc) | a == b    = bc 
-                     | otherwise = b : deleteFirst a bc
+
