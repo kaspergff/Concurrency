@@ -335,30 +335,34 @@ fail' n@(Node {handletable = h}) port lock' (Just handle) = do
   --doe algoritme dingen
   --doe hclose met doosje handle
 
-  -- remove the node as neigbour == set distance in routingtable to 24
-  ndisu <- atomically $ readTVar (routingtable n)
+  -- remove the node 
+  rt <- atomically $ readTVar (routingtable n)
   atomically $ writeTVar (routingtable n) (map (\con@(Connection from _ to)->
     if from == port && to == port
       then updateDistance con 24 
-    else con) ndisu) 
+    else con) rt) 
+  
+  ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+  let filterNdisu = filter (\(Connection p _ _) -> p /= port) ndisu 
+  atomically $ writeTVar (neighbourDistanceTable n) filterNdisu
 
   -- start recompute for all nodes 
   routingtable' <- atomically $ readTVar (routingtable n)
   interlocked lock' $ do
       forM_ routingtable' $ \(Connection too dis _) -> do
-        -- dis == 2 is from -> (* It suffices actually to do this for v s.t. Nbu[v] = w *)
-        when (dis == 2) $ do
-            let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
-            (too, dis, via) <- atomically $ recompute n too
-            when (dis /= oldDistance && dis <= 24) $ do 
-              sendmydistmessage n too dis
-              interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
-            when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
+          let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
+          (too, dis, via) <- atomically $ recompute n too
+          when (dis /= oldDistance && dis <= 24) $ do 
+            sendmydistmessage n too dis
+            interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+          when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
 
             
-          
+removeItem _ []                 = []
+removeItem x (y:ys) | x == y    = removeItem x ys
+                    | otherwise = y : removeItem x ys
  
 
 
 updateDistance :: Connection -> Int -> Connection
-updateDistance (Connection a _ b) newdis = Connection a newdis b
+updateDistance (Connection a _ _) newdis = Connection a newdis (-2)
