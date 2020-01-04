@@ -109,12 +109,14 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       --remove from handlelist
       let intendedreceiver = read port :: Int
       handletable' <- atomically $ readTVar h
-      let handle = (lookup intendedreceiver handletable')
+      let (Just handle) = (lookup intendedreceiver handletable')
       atomically $ removeFromHandleTable h intendedreceiver
+      handle' <- handle 
+      hClose handle'
       --close channel
       --perform recompute
       
-      interlocked lock' $ putStrLn $ "Disconnected" ++ show intendedreceiver
+      interlocked lock' $ putStrLn $ "Disconnected " ++ show intendedreceiver
     _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours, also no action is taken" ++ line)
   hClose chandle
 
@@ -232,10 +234,15 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
 
     "D" -> do
       handletable' <- atomically $ readTVar h
-      let handle = (lookup port handletable')
-      sendmessage handle ("DisConnectRequest " ++ show me)
-      interlocked lock' $ putStrLn $ ("Disconnected: " ++ show port)
-      fail' n port lock' handle
+      if any (==port) (map fst handletable')
+        then do
+            let handle = (lookup port handletable')
+            sendmessage handle ("DisConnectRequest " ++ show me)
+            interlocked lock' $ putStrLn $ ("Disconnected: " ++ show port)
+            fail' n port lock' handle
+            inputHandler n lock'
+        else
+            interlocked lock' $ putStrLn $ ("these nodes where not even connected in the first place")
     --                                             --
     --                                             --
     -- E is debug dus verwijder voor de eindversie --
@@ -314,10 +321,12 @@ repair n port lock= do
           sendmydistmessage n too dis
 
 fail' :: Node -> Port -> Lock -> Maybe (IO Handle)-> IO()
-fail' n@(Node {handletable = h}) port lock' handle = do
-  atomically $ removeFromHandleTable h port 
+fail' n@(Node {handletable = h}) port lock' (Just handle) = do
+  atomically $ removeFromHandleTable h port
+  handle' <- handle 
+  hClose handle'
   --doe algoritme dingen
-  --doe hclose met doosje handle
+fail' _ _ _ (Nothing) = return () -- this case wont ever occur its just to silence the compilor
  
 
 
