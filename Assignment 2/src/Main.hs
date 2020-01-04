@@ -109,10 +109,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       --remove from handlelist
       let intendedreceiver = read port :: Int
       handletable' <- atomically $ readTVar h
-      let (Just handle) = (lookup intendedreceiver handletable')
+      let handle = (lookup intendedreceiver handletable')
       atomically $ removeFromHandleTable h intendedreceiver
-      handle' <- handle 
-      hClose handle'
+      fail' n intendedreceiver lock' handle
       --close channel
       --perform recompute
       
@@ -157,7 +156,7 @@ handleMyDistMessage content' port' n@(Node {routingtable = rt, neighbourDistance
   rtable <- readTVar rt
   let oldDistance = getDistanceToPortFromRoutingTable rtable v
   (too, dis, via) <- recompute n v
-  return (too,via,dis,oldDistance)
+  return (too,read via,dis,oldDistance)
 
 handleConnectRequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
 handleConnectRequest port h ndt=  do
