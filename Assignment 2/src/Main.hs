@@ -304,13 +304,10 @@ loop' mc node me neighbours =  do
 
 repair :: Node -> Port -> Lock -> IO()
 repair n port lock= do
-    -- ndisu[w, v] := N ;
-    -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
-    -- let newNdisu = []
-    -- atomically $ writeTVar (neighbourDistanceTable n) newNdisu
-    -- add new item to routingtable
+    -- add new neigbour to routingtable
     atomically $ addToRoutingTable (routingtable n) (Connection port 1 port)
     routingtable' <- atomically $ readTVar (routingtable n)
+
     -- denk dat t t beste is als dit interlocked gebeurt
     interlocked lock $ do
       forM_ routingtable' $ \(Connection too dis _) -> do
@@ -323,3 +320,6 @@ fail' n@(Node {handletable = h}) port lock' handle = do
   --doe hclose met doosje handle
  
 
+
+updateDistance :: Connection -> Int -> Connection
+updateDistance (Connection a _ b) newdis = Connection a newdis b
