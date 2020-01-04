@@ -6,20 +6,24 @@ import System.IO
 import Data.List
 import Data.Ord (comparing)
 
-recompute :: Node -> Port -> STM (Port,Int)    
+recompute :: Node -> Port -> STM (Port,Int,String)    
 recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
     if me == int 
         then do
             addToRoutingTable r (Connection int 0 (-1))
-            return (me,0)
+            return (me,0,"local")
     else do
         bn <- readTVar bnTable
         (Connection from _d too) <- getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
         let d = _d + 1
         if d < 24 
-            then addToRoutingTable r (Connection too (d) from) 
-        else addToRoutingTable r (Connection too 24 (-2))
-        return (too,d)
+            then do 
+                addToRoutingTable r (Connection too (d) from) 
+                return (too,d,show from)
+        else do
+            addToRoutingTable r (Connection too 24 (-2))
+            return (too,d,"udef")
+        
 
 
 getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> STM (Connection)

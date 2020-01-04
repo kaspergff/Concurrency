@@ -156,8 +156,8 @@ handleMyDistMessage content' port' n@(Node {routingtable = rt, neighbourDistance
   updateNdisUTable nt (Connection s d v)
   rtable <- readTVar rt
   let oldDistance = getDistanceToPortFromRoutingTable rtable v
-  (too, dis) <- recompute n v
-  return (too,s,dis,oldDistance)
+  (too, dis, via) <- recompute n v
+  return (too,via,dis,oldDistance)
 
 handleConnectRequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
 handleConnectRequest port h ndt=  do
@@ -318,6 +318,14 @@ repair n port lock= do
     -- denk dat t t beste is als dit interlocked gebeurt
     interlocked lock $ do
       forM_ routingtable' $ \(Connection too dis _) -> do
+
+          -- the code below that is comment out is to implement the line  ndisu[w, v] := N ; But if its is used tomjudge turns red
+          -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+          -- --let updateNdis = map (\con@(Connection f d t)-> if t == too then updateDistance con 24 else con) ndisu
+          -- atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection f d t)-> 
+          --   if t == too && getDistanceToPortFromRoutingTable routingtable' f == 1
+          --     then updateDistance con 24 
+          --   else con) ndisu)
           sendmydistmessage n too dis
 
 fail' :: Node -> Port -> Lock -> Maybe (IO Handle)-> IO()
@@ -326,7 +334,30 @@ fail' n@(Node {handletable = h}) port lock' (Just handle) = do
   handle' <- handle 
   hClose handle'
   --doe algoritme dingen
-fail' _ _ _ (Nothing) = return () -- this case wont ever occur its just to silence the compilor
+  --doe hclose met doosje handle
+
+  -- remove the node as neigbour == set distance in routingtable to 24
+  ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+  atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection from _ to)->
+    if from == port && to == port
+      then updateDistance con 24 
+    else con) ndisu) 
+
+  -- start recompute for all nodes 
+  routingtable' <- atomically $ readTVar (routingtable n)
+  interlocked lock' $ do
+      forM_ routingtable' $ \(Connection too dis _) -> do
+        -- dis == 2 is from -> (* It suffices actually to do this for v s.t. Nbu[v] = w *)
+        when (dis == 2) $ do
+            let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
+            (too, dis, via) <- atomically $ recompute n too
+            when (dis /= oldDistance && dis <= 24) $ do 
+              sendmydistmessage n too dis
+              interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+            when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
+
+            
+          
  
 
 
