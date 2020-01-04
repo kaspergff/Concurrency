@@ -14,7 +14,7 @@ recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable
             return (me,0)
     else do
         bn <- readTVar bnTable
-        let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
+        let (Connection from _d too) = getMinDistanceFromNBto bn int 
         let d = _d + 1
         if d < 24 
             then addToRoutingTable r (Connection too (d) from) 

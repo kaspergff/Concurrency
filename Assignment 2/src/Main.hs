@@ -74,7 +74,6 @@ listenForConnections serverSocket lock' node = do
   _ <- forkIO $ handleConnection connection' lock' node
   listenForConnections serverSocket lock' node
 
-
 --this function is used for performing different actions for different types of incomming messages
 handleConnection :: Socket -> Lock -> Node -> IO ()
 handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt,messageCount = mc}) = do
@@ -87,7 +86,6 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "Mystatus" ->  do
       atomically $ handlemystatus mc
     "Mydist" -> do
-
       (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
       when (dis /= oldDistance) $ do 
         sendmydistmessage n too dis
