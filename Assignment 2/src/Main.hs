@@ -3,7 +3,7 @@ module Main where
 import NetwerkFunctions
 import Structure
 
-import Control.Monad (when)
+import Control.Monad (when, forM_)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Exception
@@ -89,9 +89,10 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "Mydist" -> do
 
       (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
-      when (dis /= oldDistance && dis < 24) $ do 
+      when (dis /= oldDistance && dis <= 24) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+      
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h
@@ -285,3 +286,4 @@ loop' mc node me neighbours =  do
     else do
        sendmydistmessage node me 0
        threadDelay 1000000000
+

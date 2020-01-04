@@ -4,7 +4,7 @@ import Control.Concurrent.STM
 import Control.Exception
 import System.IO
 import Data.List
-
+import Data.Ord (comparing)
 
 recompute :: Node -> Port -> STM (Port,Int)    
 recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
@@ -14,7 +14,7 @@ recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable
             return (me,0)
     else do
         bn <- readTVar bnTable
-        let (Connection from _d too) = getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
+        (Connection from _d too) <- getMinDistanceFromNBto bn int -- getMinDistanceFromNBto moet vragen aan alle buren of ze de afstand naar de int doorsturen en daar de laagste van kiezen, portnumber = nummer van de buur
         let d = _d + 1
         if d < 24 
             then addToRoutingTable r (Connection too (d) from) 
@@ -23,12 +23,22 @@ recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable
 
 
 -- function to get the min distance to a node from NeighbouDistanceTable
-getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> Connection
-getMinDistanceFromNBto [x] _ = x
-getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port = 
-    if a < b && pa == port
-        then getMinDistanceFromNBto (x:xs) port
-        else getMinDistanceFromNBto (y:xs) port
+-- getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> Connection
+-- getMinDistanceFromNBto [x] _ = x
+-- getMinDistanceFromNBto ( x@(Connection _ a pa):y@(Connection _ b _):xs) port = 
+--     if a < b && pa == port
+--         then getMinDistanceFromNBto (x:xs) port
+--         else getMinDistanceFromNBto (y:xs) port
+getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> STM (Connection)
+getMinDistanceFromNBto tb p = do
+    let filterList = filter (\(Connection _ _ t)-> t == p) tb
+        sortList   = sortBy (comparing (\(Connection _ dis _)->dis)) filterList
+
+    if length sortList > 0
+        then return (head sortList)
+    else return (Connection (-2) 24 p)
+
+
 
 --function to add a connection to the routing table
 addToRoutingTable :: TVar Table -> Connection -> STM ()
@@ -70,10 +80,11 @@ sendmessage (Just x) message = do
 sendmessage (Nothing) _ = putStrLn $ show  "error message"
 
 
-sendmystatusmessage (Node {handletable = h}) = do
+
+sendmystatusmessage (Node {handletable = h,nodeID = id'}) = do
     h' <- atomically $ readTVar h
     let receivers = map snd h'
-    let message = ("Mystatus " )
+    let message = "Mystatus "
     let justreceivers = map (\x -> (Just x)) receivers
     mapM_ (flip sendmessage message ) justreceivers 
 
