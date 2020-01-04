@@ -11,7 +11,6 @@ import Network.Socket
 import Data.List
 
 --datatypes
---vanaf nu is een node gwn lekker een node
 data Node = Node {
     nodeID       :: Int,
     routingtable :: (TVar Table),
@@ -19,11 +18,8 @@ data Node = Node {
     neighbourDistanceTable :: (TVar NeighbourDistanceTable),
     messageCount :: (TVar Int)
     }  
--- ik wil dit graag
-type Port = Int
 
---we moeten die tabel gaan zien als een reachability graph
---vanaf nu zijn de connecties gwn lekker een eigen type
+type Port = Int
 data Connection = Connection Port Int Port -- | DConnection Port Int String
 instance Show Connection where
     show (Connection a b (-2)) = show a ++ " " ++ show b ++ " " ++ "udef"
@@ -35,9 +31,7 @@ instance Eq Connection where
 
 data DistanceTo = DistanceTo Port Int
 
---tabel is een lijst van connecties
 type Table       = [Connection] 
 type NodeHandle  = (Int,IO Handle)
 type HandleTable = [NodeHandle]
-
 type NeighbourDistanceTable = [Connection]

@@ -38,7 +38,6 @@ main = do
   messagecount    <- newTVarIO $ 0
   nbDistanceTable <- newTVarIO  []
 
-
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable messagecount 
 
@@ -89,34 +88,24 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
   -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
 
-  (messagetype,sender,content)  <- atomically $ processline line 
+  (messagetype,port,content)  <- atomically $ processline line 
   case messagetype of
-    --"Fail" -> do
     "Mystatus" ->  do
       atomically $ handlemystatus mc
-     
     "Mydist" -> do
-      -- h' <- atomically $ readTVar h
-      -- mc' <- atomically $ readTVar mc
-      -- when (mc' == length h' && length h' > 1 && mc' > 1) $ do
-      (too,via,dis,oldDistance) <- atomically $ handlemydist content sender n
+
+      (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
       when (dis /= oldDistance) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
-        --sendmydistmessage n too dis
-      -- return ()
-        --hier moet nog wat routine bij bedacht worden zoals wanneer toevoegen aan rt?
+
     "ConnectRequest" -> do
-      let intendedconnection = read sender :: Int
-      let handle = intToHandle intendedconnection
-      h' <- atomically $ readTVar h
-      atomically $ writeTVar h (h' ++ [(intendedconnection,handle)])
+      (intendedconnection) <- atomically $ handleconectrequest port h
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
-    --"Repair" -> do
+
     "StringMessage" -> do
-      --sender in this context means the intended destination
-      --ik ga dit nog wel aanpassen maar doe maar ff alsof dit ok is
-      let intendedreceiver = read sender :: Int
+      --port in this context means the intended destination
+      let intendedreceiver = read port :: Int
       let message = content 
       if intendedreceiver == id'
         then interlocked lock' $ putStrLn (concat content)
@@ -134,10 +123,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
 processline :: String -> STM (String,String,[String])
 processline l = do
   let messagetype' = head (words l)
-  let sender'      = words l !! 1 
-  let content'     = (words l \\ [messagetype']) \\ [sender']
-  return (messagetype',sender',content')
-
+  let port'      = words l !! 1 
+  let content'     = (words l \\ [messagetype']) \\ [port']
+  return (messagetype',port',content')
 
 handlemystatus :: TVar Int -> STM ()
 handlemystatus mc = do
@@ -145,23 +133,28 @@ handlemystatus mc = do
   writeTVar mc (mc' + 1) 
 
 handlemydist :: [String] -> String -> Node -> STM (Port,Port,Int,Int)
-handlemydist content' sender' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
+handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
   let v = read (head content') :: Int 
   let d = read (last content') :: Int
-  let s = read sender' :: Int
+  let s = read port' :: Int
   updateNdisUTable nt (Connection s d v)
-  --interlocked lock' $putStrLn $ " 1e " ++ show s ++ " " ++ show d ++ " " ++ show v 
   rtable <- readTVar rt
   let oldDistance = getDistanceToPortFromRoutingTable rtable v
   (too, dis) <- recompute n v
   return (too,s,dis,oldDistance)
+
+handleconectrequest :: String -> TVar HandleTable -> STM (Port)
+handleconectrequest port h =  do
+  let intendedconnection = read port :: Int
+  let handle = intToHandle intendedconnection
+  addToHandleTable h intendedconnection handle
+  return (intendedconnection)
  
-        --putStrLn $ "Distance to " ++ show v ++ " is now " ++ show d ++ " via " ++ show s  
 
   -------------------- End Template---------------------
 
   --this function is used for looking up which node is the best neighbour when going to a third node
-  --note that this results in a maybe Int since some node may be removed the lookup process
+  --the -10000 indicates there is no best neighbour for the given port and the -10000 cannot be found in the handletable so no message will be sent
 findbestneighbour :: Port -> Table -> Port
 findbestneighbour _ [] = -10000
 findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
@@ -182,10 +175,10 @@ createConnection int  = Connection int 1 int
 initalRtable :: [Int] -> Table
 initalRtable = map createConnection 
 
--- addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
--- addToHandleTable handletable neighbour handle = do
--- htable <- takeTVar handletable
--- writeTVar handletable (htable ++ [(neighbour,handle)])
+addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
+addToHandleTable handletable neighbour handle = do
+  htable <- readTVar handletable
+  writeTVar handletable (htable ++ [(neighbour,handle)])
 
 -- function to connect to all the neighbours 
 connection :: [Port] -> HandleTable
@@ -277,7 +270,7 @@ loop' mc node me neighbours =  do
   messagecount' <- atomically $ readTVar mc
   if messagecount' /=  length neighbours
     then do
-        threadDelay 1500000
+        threadDelay 2500000
         loop' mc node me neighbours
     else do
        sendmydistmessage node me 0
