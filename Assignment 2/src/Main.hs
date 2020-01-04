@@ -286,14 +286,17 @@ repair n port lock= do
     -- add new neigbour to routingtable
     atomically $ addToRoutingTable (routingtable n) (Connection port 1 port)
     routingtable' <- atomically $ readTVar (routingtable n)
-    
+
     -- denk dat t t beste is als dit interlocked gebeurt
     interlocked lock $ do
       forM_ routingtable' $ \(Connection too dis _) -> do
-          ndisu <- atomically $ readTVar (neighbourDistanceTable n)
-          --let updateNdis = map (\con@(Connection f d t)-> if t == too then updateDistance con 24 else con) ndisu
-          atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection f d t)-> if t == too then updateDistance con 24 else con) ndisu)
+          -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+          -- --let updateNdis = map (\con@(Connection f d t)-> if t == too then updateDistance con 24 else con) ndisu
+          -- atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection f d t)-> 
+          --   if t == too && getDistanceToPortFromRoutingTable routingtable' f == 1
+          --     then updateDistance con 24 
+          --   else con) ndisu)
           sendmydistmessage n too dis
 
 updateDistance :: Connection -> Int -> Connection
-updateDistance c@(Connection a dis b) newdis = Connection a newdis b
+updateDistance (Connection a _ b) newdis = Connection a newdis b
