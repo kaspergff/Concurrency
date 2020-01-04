@@ -80,20 +80,20 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
   chandle <- socketToHandle connection' ReadWriteMode
   line <- hGetLine chandle
 
-  (messagetype,port,content)  <- atomically $ processline line 
+  (messagetype,port,content)  <- atomically $ processLine line 
   case messagetype of
     --if a mystatus message is received one is added to a counter which is used to determine if all neighbours are active
     "Mystatus" ->  do
-      atomically $ handlemystatus mc
+      atomically $ handleActivationMessage mc
     "Mydist" -> do
-      (too,via,dis,oldDistance) <- atomically $ handlemydist content port n
+      (too,via,dis,oldDistance) <- atomically $ handleMyDistMessage content port n
       when (dis /= oldDistance && dis <= 24) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
       when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
-      (intendedconnection) <- atomically $ handleconectrequest port h nt
+      (intendedconnection) <- atomically $ handleConnectRequest port h nt
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
       repair n intendedconnection lock'
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
@@ -123,7 +123,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
 sendToNextNode :: Lock -> TVar HandleTable -> TVar Table -> [String] -> Int -> IO ()
 sendToNextNode lock' h rt message intendedreceiver = do
   rt' <- atomically $ readTVar rt
-  let bestneighbour = findbestneighbour intendedreceiver rt'
+  let bestneighbour = findBestNeighbour intendedreceiver rt'
   handletable' <- atomically $ readTVar h
   interlocked lock' $ putStrLn $ "message for " ++ show intendedreceiver ++ " is relayed through " ++ show bestneighbour
   --find handle of best neighbour for the destination (port) 
@@ -131,25 +131,25 @@ sendToNextNode lock' h rt message intendedreceiver = do
   sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
 
 
---note that the functions processline,handlemystatus,handlemydist and handleconectrequest are used by handleconnection. they are all made in the STM type so they can be executed actomically in the handleconnection function
+--note that the functions processLine,handleActivationMessage,handleMyDistMessage and handleConnectRequest are used by handleconnection. they are all made in the STM type so they can be executed actomically in the handleconnection function
 
 --this function is used to disect the incomming messages 
-processline :: String -> STM (String,String,[String])
-processline l = do
+processLine :: String -> STM (String,String,[String])
+processLine l = do
   let messagetype' = head (words l)
   let port'        = words l !! 1 
   let content'     = (words l \\ [messagetype']) \\ [port']
   return (messagetype',port',content')
 
 --this function is used to add one to the active neighbour counter
-handlemystatus :: TVar Int -> STM ()
-handlemystatus mc = do
+handleActivationMessage :: TVar Int -> STM ()
+handleActivationMessage mc = do
   mc' <- readTVar mc
   writeTVar mc (mc' + 1) 
 
 --this function is used to activate recompute upon receiving a mydist message
-handlemydist :: [String] -> String -> Node -> STM (Port,Port,Int,Int)
-handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
+handleMyDistMessage :: [String] -> String -> Node -> STM (Port,Port,Int,Int)
+handleMyDistMessage content' port' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
   let v = read (head content') :: Int 
   let d = read (last content') :: Int
   let s = read port' :: Int
@@ -159,8 +159,8 @@ handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable =
   (too, dis) <- recompute n v
   return (too,s,dis,oldDistance)
 
-handleconectrequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
-handleconectrequest port h ndt=  do
+handleConnectRequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
+handleConnectRequest port h ndt=  do
   let intendedconnection = read port :: Int
   let handle = intToHandle intendedconnection
   addToHandleTable h intendedconnection handle
@@ -171,10 +171,10 @@ handleconectrequest port h ndt=  do
 
   --this function is used for looking up which node is the best neighbour when going to a third node
   --the -10000 indicates there is no best neighbour for the given port and the -10000 cannot be found in the handletable so no message will be sent
-findbestneighbour :: Port -> Table -> Port
-findbestneighbour _ [] = -10000
-findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
-                                                           | otherwise = findbestneighbour distandneighbour xs
+findBestNeighbour :: Port -> Table -> Port
+findBestNeighbour _ [] = -10000
+findBestNeighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
+                                                           | otherwise = findBestNeighbour distandneighbour xs
 
 updateNdisUTable :: TVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
@@ -219,7 +219,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
     "B" -> do 
       routingtable' <- atomically $ readTVar r
       --find best neighbour for the destination (port) 
-      let bestneighbour = findbestneighbour port routingtable'
+      let bestneighbour = findBestNeighbour port routingtable'
       handletable' <- atomically $ readTVar h
       --find handle of best neighbour for the destination (port) 
       --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
