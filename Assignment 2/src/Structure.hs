@@ -12,11 +12,11 @@ import Data.List
 
 --datatypes
 data Node = Node {
-    nodeID       :: Int,
-    routingtable :: (TVar Table),
-    handletable  :: (TVar HandleTable),
-    neighbourDistanceTable :: (TVar NeighbourDistanceTable),
-    messageCount :: (TVar Int)
+    nodeID                 :: Int,
+    routingtable           :: TVar Table,
+    handletable            :: TVar HandleTable,
+    neighbourDistanceTable :: TVar NeighbourDistanceTable,
+    messageCount           :: TVar Int
     }  
 
 type Port = Int
@@ -31,7 +31,7 @@ instance Eq Connection where
 
 data DistanceTo = DistanceTo Port Int
 
-type Table       = [Connection] 
-type NodeHandle  = (Int,IO Handle)
-type HandleTable = [NodeHandle]
+type Table                  = [Connection] 
+type NodeHandle             = (Int,IO Handle)
+type HandleTable            = [NodeHandle]
 type NeighbourDistanceTable = [Connection]

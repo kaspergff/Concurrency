@@ -37,11 +37,11 @@ main = do
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable messagecount 
   -- Let a seperate thread listen for incomming connections
-  _ <- forkIO $ listenForConnections serverSocket lock' node
+  forkIO $ listenForConnections serverSocket lock' node
   -- -- Part 2 input
-  _ <- forkIO $ inputHandler node lock'
+  forkIO $ inputHandler node lock'
     -- sendstatusmessage
-  sendmystatusmessage node 
+  sendMyStatusMessage node 
     -- send message MyDist
     -- this loop is used to make sure a node only sends out its mydistmessages when al its initial neighbours are online
   loop' messagecount node me neighbours
@@ -88,7 +88,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     "Mydist" -> do
       (too,via,dis,oldDistance) <- atomically $ handleMyDistMessage content port n
       when (dis /= oldDistance && dis <= 24) $ do 
-        sendmydistmessage n too dis
+        sendMyDistMessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
       when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
@@ -127,7 +127,7 @@ sendToNextNode lock' h rt message intendedreceiver = do
   interlocked lock' $ putStrLn $ "message for " ++ show intendedreceiver ++ " is relayed through " ++ show bestneighbour
   --find handle of best neighbour for the destination (port) 
   --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
-  sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
+  sendMessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
 
 
 --note that the functions processLine,handleActivationMessage,handleMyDistMessage and handleConnectRequest are used by handleconnection. they are all made in the STM type so they can be executed actomically in the handleconnection function
@@ -222,12 +222,12 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       handletable' <- atomically $ readTVar h
       --find handle of best neighbour for the destination (port) 
       --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
-      sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
+      sendMessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
       inputHandler n lock'
     "C" -> do 
       let handle = intToHandle port
       atomically $ addToHandleTable h port handle 
-      sendmessage (Just handle) ("ConnectRequest " ++ show me)
+      sendMessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
       repair n port lock'
 
@@ -236,7 +236,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       if any (==port) (map fst handletable')
         then do
             let handle = (lookup port handletable')
-            sendmessage handle ("DisConnectRequest " ++ show me)
+            sendMessage handle ("DisConnectRequest " ++ show me)
             interlocked lock' $ putStrLn $ ("Disconnected: " ++ show port)
             fail' n port lock' handle
             inputHandler n lock'
@@ -304,7 +304,7 @@ loop' mc node me neighbours =  do
         threadDelay 2000000
         loop' mc node me neighbours
     else do
-       sendmydistmessage node me 0
+       sendMyDistMessage node me 0
        threadDelay 1000000
        loop' mc node me neighbours
 
@@ -325,9 +325,12 @@ repair n port lock= do
           --   if t == too && getDistanceToPortFromRoutingTable routingtable' f == 1
           --     then updateDistance con 24 
           --   else con) ndisu)
-          sendmydistmessage n too dis
+          sendMyDistMessage n too dis
+
+
 
 fail' :: Node -> Port -> Lock -> Maybe (IO Handle)-> IO()
+fail' _ _ _ (Nothing) = return ()
 fail' n@(Node {handletable = h}) port lock' (Just handle) = do
   atomically $ removeFromHandleTable h port
   handle' <- handle 
@@ -351,7 +354,7 @@ fail' n@(Node {handletable = h}) port lock' (Just handle) = do
             let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
             (too, dis, via) <- atomically $ recompute n too
             when (dis /= oldDistance && dis <= 24) $ do 
-              sendmydistmessage n too dis
+              sendMyDistMessage n too dis
               interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
             when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
 
