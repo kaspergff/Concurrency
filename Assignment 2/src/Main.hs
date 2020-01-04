@@ -93,9 +93,10 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
-      (intendedconnection) <- atomically $ handleconectrequest port h
+      (intendedconnection) <- atomically $ handleconectrequest port h nt
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
-      --sendmydistmessages n  
+      repair n intendedconnection lock'
+      
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
@@ -147,11 +148,13 @@ handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable =
   (too, dis) <- recompute n v
   return (too,s,dis,oldDistance)
 
-handleconectrequest :: String -> TVar HandleTable -> STM (Port)
-handleconectrequest port h =  do
+handleconectrequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
+handleconectrequest port h ndt=  do
   let intendedconnection = read port :: Int
   let handle = intToHandle intendedconnection
   addToHandleTable h intendedconnection handle
+  -- add port to ndis
+  updateNdisUTable ndt (Connection intendedconnection 0 intendedconnection)
   return (intendedconnection)
  
 
@@ -166,7 +169,7 @@ updateNdisUTable :: TVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
   table <- readTVar nt
   let newList = filter ( not.(\(Connection from' _ to') -> to' == to && from' == from)) table
-  writeTVar nt $ newList ++ [con]
+  writeTVar nt $ [con] ++ newList
   return ()
 
 --function for adding a single entry of the (Int, IO Handle) type to the handle table
@@ -209,14 +212,8 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       atomically $ addToHandleTable h port handle 
       sendmessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
-      sendmydistmessage n me 0
-      inputHandler n lock'
-    
-    
-    
-    
-    
-    
+      repair n port lock'
+
     
     --                                             --
     --                                             --
@@ -284,3 +281,16 @@ loop' mc node me neighbours =  do
        threadDelay 1000000
        loop' mc node me neighbours
 
+repair :: Node -> Port -> Lock -> IO()
+repair n port lock= do
+    -- ndisu[w, v] := N ;
+    -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+    -- let newNdisu = []
+    -- atomically $ writeTVar (neighbourDistanceTable n) newNdisu
+    -- add new item to routingtable
+    atomically $ addToRoutingTable (routingtable n) (Connection port 1 port)
+    routingtable' <- atomically $ readTVar (routingtable n)
+    -- denk dat t t beste is als dit interlocked gebeurt
+    interlocked lock $ do
+      forM_ routingtable' $ \(Connection too dis _) -> do
+          sendmydistmessage n too dis
