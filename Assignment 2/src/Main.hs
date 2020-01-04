@@ -95,8 +95,11 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
 
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
-      (intendedconnection) <- atomically $ handleconectrequest port h
+      (intendedconnection) <- atomically $ handleconectrequest port h nt
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
+      -- send mydist message to yourself to start recompute
+      
+
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
@@ -145,11 +148,13 @@ handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable =
   (too, dis) <- recompute n v
   return (too,s,dis,oldDistance)
 
-handleconectrequest :: String -> TVar HandleTable -> STM (Port)
-handleconectrequest port h =  do
+handleconectrequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
+handleconectrequest port h ndt=  do
   let intendedconnection = read port :: Int
   let handle = intToHandle intendedconnection
   addToHandleTable h intendedconnection handle
+  -- add port to ndis
+  updateNdisUTable ndt (Connection intendedconnection 0 intendedconnection)
   return (intendedconnection)
  
 
