@@ -146,7 +146,7 @@ handlemystatus mc = do
   writeTVar mc (mc' + 1) 
 
 --this function is used to activate recompute upon receiving a mydist message
-handlemydist :: [String] -> String -> Node -> STM (Port,Port,Int,Int)
+handlemydist :: [String] -> String -> Node -> STM (Port,String,Int,Int)
 handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
   let v = read (head content') :: Int 
   let d = read (last content') :: Int
@@ -154,8 +154,8 @@ handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable =
   updateNdisUTable nt (Connection s d v)
   rtable <- readTVar rt
   let oldDistance = getDistanceToPortFromRoutingTable rtable v
-  (too, dis) <- recompute n v
-  return (too,s,dis,oldDistance)
+  (too, dis, via) <- recompute n v
+  return (too,via,dis,oldDistance)
 
 handleconectrequest :: String -> TVar HandleTable -> TVar NeighbourDistanceTable -> STM (Port)
 handleconectrequest port h ndt=  do
@@ -326,6 +326,29 @@ fail' n@(Node {handletable = h}) port lock' handle = do
   atomically $ removeFromHandleTable h port 
   --doe algoritme dingen
   --doe hclose met doosje handle
+
+  -- remove the node as neigbour == set distance in routingtable to 24
+  ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+  atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection from _ to)->
+    if from == port && to == port
+      then updateDistance con 24 
+    else con) ndisu) 
+
+  -- start recompute for all nodes 
+  routingtable' <- atomically $ readTVar (routingtable n)
+  interlocked lock' $ do
+      forM_ routingtable' $ \(Connection too dis _) -> do
+        -- dis == 2 is from -> (* It suffices actually to do this for v s.t. Nbu[v] = w *)
+        when (dis == 2) $ do
+            let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
+            (too, dis, via) <- atomically $ recompute n too
+            when (dis /= oldDistance && dis <= 24) $ do 
+              sendmydistmessage n too dis
+              interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+            when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
+
+            
+          
  
 
 
