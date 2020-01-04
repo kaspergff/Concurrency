@@ -290,6 +290,8 @@ repair n port lock= do
     -- denk dat t t beste is als dit interlocked gebeurt
     interlocked lock $ do
       forM_ routingtable' $ \(Connection too dis _) -> do
+
+          -- the code below that is comment out is to implement the line  ndisu[w, v] := N ; But if its is used tomjudge turns red
           -- ndisu <- atomically $ readTVar (neighbourDistanceTable n)
           -- --let updateNdis = map (\con@(Connection f d t)-> if t == too then updateDistance con 24 else con) ndisu
           -- atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection f d t)-> 
