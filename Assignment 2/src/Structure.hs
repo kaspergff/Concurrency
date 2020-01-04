@@ -11,6 +11,7 @@ import Network.Socket
 import Data.List
 
 --datatypes
+-- node holds al the information
 data Node = Node {
     nodeID                 :: Int,
     routingtable           :: TVar Table,
@@ -20,6 +21,7 @@ data Node = Node {
     }  
 
 type Port = Int
+-- connection -> Port distance Port
 data Connection = Connection Port Int Port -- | DConnection Port Int String
 instance Show Connection where
     show (Connection a b (-2)) = show a ++ " " ++ show b ++ " " ++ "udef"
@@ -28,8 +30,6 @@ instance Show Connection where
 
 instance Eq Connection where
     (Connection a _ b) == (Connection c _ d) = a == c && b == d 
-
-data DistanceTo = DistanceTo Port Int
 
 type Table                  = [Connection] 
 type NodeHandle             = (Int,IO Handle)

@@ -46,6 +46,12 @@ main = do
     -- this loop is used to make sure a node only sends out its mydistmessages when al its initial neighbours are online
   loop' messagecount node me neighbours
  
+
+
+  threadDelay 1000000000000000000000000000
+
+
+
 readCommandLineArguments :: IO (Int, [Int])
 readCommandLineArguments = do
   args <- getArgs
@@ -85,12 +91,14 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     --if a mystatus message is received one is added to a counter which is used to determine if all neighbours are active
     "Mystatus" ->  do
       atomically $ handleActivationMessage mc
+    -- message that distance from nb to different node has changed
     "Mydist" -> do
       (too,via,dis,oldDistance) <- atomically $ handleMyDistMessage content port n
-      when (dis /= oldDistance && dis <= 24) $ do 
+      when (dis /= oldDistance && dis < 24) $ do 
         sendMyDistMessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
-      when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
+      when (dis > 23) $ do
+         interlocked lock'$ putStrLn $ "Unreachable: "++ show too
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleConnectRequest port h nt
@@ -175,6 +183,7 @@ findBestNeighbour _ [] = -10000
 findBestNeighbour distandneighbour ((Connection x _ y):xs) | distandneighbour == x =  y
                                                            | otherwise = findBestNeighbour distandneighbour xs
 
+-- function to update the ndisu table
 updateNdisUTable :: TVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
   table <- readTVar nt
@@ -188,6 +197,7 @@ addToHandleTable handletable neighbour handle = do
   htable <- readTVar handletable
   writeTVar handletable (htable ++ [(neighbour,handle)])
 
+-- function to remove a handle from the handle table
 removeFromHandleTable :: (TVar HandleTable) -> Int -> STM()
 removeFromHandleTable handletable neighbour = do
   htable <- readTVar handletable
@@ -230,30 +240,23 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       sendMessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
       repair n port lock'
+      inputHandler n lock'
 
     "D" -> do
       handletable' <- atomically $ readTVar h
-      if any (==port) (map fst handletable')
+      if any (==port) (map fst handletable') && port /= me
         then do
             let handle = (lookup port handletable')
             sendMessage handle ("DisConnectRequest " ++ show me)
             interlocked lock' $ putStrLn $ ("Disconnected: " ++ show port)
             fail' n port lock' handle
             inputHandler n lock'
-        else
+      else do
             interlocked lock' $ putStrLn $ ("these nodes where not even connected in the first place")
-    --                                             --
-    --                                             --
-    -- E is debug dus verwijder voor de eindversie --
-    --                                             --
-    --                                             --
-    "E" -> do 
-      printtabel <- atomically $ readTVar (neighbourDistanceTable n)
-      interlocked lock' $ printRtable me printtabel
-      inputHandler n lock'
+            inputHandler n lock'
     _ -> do
       putStrLn $ "wrong input"
-      inputHandler n lock'
+  inputHandler n lock'
 
 -- this parser is used to parse the commands given in the console       
 inputParser :: String -> (String, Int, String)
@@ -273,41 +276,21 @@ printRtable :: Int -> Table -> IO ()
 printRtable _ []     = return ()
 printRtable _ table = mapM_ print table
 
----                                                --
---- DEZE IS OOK DEBUG EN MOET WEG IN DE EINDVERSIE --
----                                                --
-printHtable :: (Int,IO Handle) -> IO ()
-printHtable (i, iOh) = do
-  h <- iOh
-  print $ show i ++ show h
-
-newtype Lock = Lock (MVar ())
-
-newLock :: IO Lock
-newLock = Lock <$> newMVar ()
-
-lock :: Lock -> IO ()
-lock (Lock v) = takeMVar v
-
-unlock :: Lock -> IO ()
-unlock (Lock v) = putMVar v ()
-
-interlocked :: Lock -> IO a -> IO a
-interlocked lock_ action =
-    (lock lock_ *> action) `finally` (unlock lock_)
-
+-- this loop is made to make shure al our nb are ready to start 
 loop' :: TVar Int -> Node -> Int -> [Int] -> IO ()
 loop' mc node me neighbours =  do
   messagecount' <- atomically $ readTVar mc
-  if messagecount' /=  length neighbours
+  if messagecount' <  length neighbours
     then do
         threadDelay 2000000
         loop' mc node me neighbours
     else do
        sendMyDistMessage node me 0
-       threadDelay 1000000
+       threadDelay 100000
        loop' mc node me neighbours
 
+
+-- function to implement the repair mode of the algortihm
 repair :: Node -> Port -> Lock -> IO()
 repair n port lock= do
     -- add new neigbour to routingtable
@@ -328,40 +311,54 @@ repair n port lock= do
           sendMyDistMessage n too dis
 
 
-
+-- fail functoin of the algorithm. Used in disconnect
 fail' :: Node -> Port -> Lock -> Maybe (IO Handle)-> IO()
 fail' _ _ _ (Nothing) = return ()
 fail' n@(Node {handletable = h}) port lock' (Just handle) = do
-  atomically $ removeFromHandleTable h port
-
-  -- remove the node 
-  rt <- atomically $ readTVar (routingtable n)
-  atomically $ writeTVar (routingtable n) (map (\con@(Connection from _ to)->
-    if from == port && to == port
-      then updateDistance con 24 
-    else con) rt) 
-  
-  ndisu <- atomically $ readTVar (neighbourDistanceTable n)
-  let filterNdisu = filter (\(Connection p _ _) -> p /= port) ndisu 
-  atomically $ writeTVar (neighbourDistanceTable n) filterNdisu
-
-  -- start recompute for all nodes 
-  routingtable' <- atomically $ readTVar (routingtable n)
   interlocked lock' $ do
-      forM_ routingtable' $ \(Connection too dis _) -> do
-          let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
-          (too, dis, via) <- atomically $ recompute n too
-          when (dis /= oldDistance && dis <= 24) $ do 
-            sendMyDistMessage n too dis
-            interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
-          when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
+    -- remove handle
+    atomically $ removeFromHandleTable h port
 
-            
-removeItem _ []                 = []
-removeItem x (y:ys) | x == y    = removeItem x ys
-                    | otherwise = y : removeItem x ys
- 
+    -- make the node unreachable
+    rt <- atomically $ readTVar (routingtable n)
+    atomically $ writeTVar (routingtable n) (map (\con@(Connection from _ to)->
+      if from == port && to == port
+        then updateDistance con 24 
+      else con) rt) 
 
+    -- remove node from ndisu table
+    ndisu <- atomically $ readTVar (neighbourDistanceTable n)
+    let filterNdisu = filter (\(Connection p _ _) -> p /= port) ndisu 
+    atomically $ writeTVar (neighbourDistanceTable n) filterNdisu
+    -- start recompute for all nodes 
+    routingtable' <- atomically $ readTVar (routingtable n)
 
+    -- do the recompute part
+    sendMyDistMessage n port 24
+    forM_ routingtable' $ \(Connection too _dis _) -> do
+        let oldDistance = getDistanceToPortFromRoutingTable routingtable' too
+        (too, dis, via) <- atomically $ recompute n too
+        when (dis /= oldDistance && dis < 24) $ do 
+          sendMyDistMessage n too dis
+          putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+        when (dis > 23) $  putStrLn $ "Unreachable: "++ show too
+
+-- update distance used in repair.fail -> improve
 updateDistance :: Connection -> Int -> Connection
 updateDistance (Connection a _ _) newdis = Connection a newdis (-2)
+
+-- write lock
+newtype Lock = Lock (MVar ())
+
+newLock :: IO Lock
+newLock = Lock <$> newMVar ()
+
+lock :: Lock -> IO ()
+lock (Lock v) = takeMVar v
+
+unlock :: Lock -> IO ()
+unlock (Lock v) = putMVar v ()
+
+interlocked :: Lock -> IO a -> IO a
+interlocked lock_ action =
+    (lock lock_ *> action) `finally` (unlock lock_)

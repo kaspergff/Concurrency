@@ -2,3 +2,15 @@
 
 http://www.cs.uu.nl/docs/vakken/b3cc/assignments.html
 
+Group 113
+
+Kasper de Graaff        6281427
+Stefan van der Pijl		6201202
+
+This is our implementation of the net change algorithm for assignment 2 of concurrency.
+
+A few important remarks.
+- During the testing with Tomjudge we came to different results. Sometimes the tests went well, other times the result was less positive.
+
+- In our implementation we used the value 25 for N (network-sized). This is an arbitrary number by far
+
