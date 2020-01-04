@@ -91,14 +91,11 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
       when (dis /= oldDistance && dis > 23) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
-      
-
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
-      threadDelay 100
-      sendmydistmessage n id' 0
+      --sendmydistmessages n  
     --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     --please note that even though the routing table may not always be correct the message always gets to the desired destination by following the foulty routing table
     "StringMessage" -> do
@@ -107,16 +104,19 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       let message = content 
       if intendedreceiver == id'
         then interlocked lock' $ putStrLn (concat content)
-        else do
-          rt' <- atomically $ readTVar rt
-          let bestneighbour = findbestneighbour intendedreceiver rt'
-          handletable' <- atomically $ readTVar h
-          interlocked lock' $ putStrLn $ "message for " ++ show intendedreceiver ++ " is relayed through " ++ show bestneighbour
-          --find handle of best neighbour for the destination (port) 
-          --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
-          sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
-    _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours" ++ line)
+        else sendToNextNode lock' h rt message intendedreceiver
+    _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours, also no action is taken" ++ line)
   hClose chandle
+
+sendToNextNode :: Lock -> TVar HandleTable -> TVar Table -> [String] -> Int -> IO ()
+sendToNextNode lock' h rt message intendedreceiver = do
+  rt' <- atomically $ readTVar rt
+  let bestneighbour = findbestneighbour intendedreceiver rt'
+  handletable' <- atomically $ readTVar h
+  interlocked lock' $ putStrLn $ "message for " ++ show intendedreceiver ++ " is relayed through " ++ show bestneighbour
+  --find handle of best neighbour for the destination (port) 
+  --send message to best neighbour for the destination d and send 'd' along to be used on the receiving side
+  sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show intendedreceiver ++ " " ++ concat message)
 
 
 --note that the functions processline,handlemystatus,handlemydist and handleconectrequest are used by handleconnection. they are all made in the STM type so they can be executed actomically in the handleconnection function
@@ -205,22 +205,25 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       sendmessage (lookup bestneighbour handletable') ("StringMessage " ++ show port ++ " " ++ message)
       inputHandler n lock'
     "C" -> do 
-      --please note that the routing table may not be always correct but connect works 100% of the time
       let handle = intToHandle port
       atomically $ addToHandleTable h port handle 
       sendmessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
-      --wait a bit so that the other node gets the chance to add this node to its handletable before continuing
-      threadDelay 100
       sendmydistmessage n me 0
       inputHandler n lock'
     
+    
+    
+    
+    
+    
+    
     --                                             --
     --                                             --
-    -- D is debug dus verwijder voor de eindversie --
+    -- E is debug dus verwijder voor de eindversie --
     --                                             --
     --                                             --
-    "D" -> do 
+    "E" -> do 
       printtabel <- atomically $ readTVar (neighbourDistanceTable n)
       interlocked lock' $ printRtable me printtabel
       inputHandler n lock'
@@ -278,8 +281,6 @@ loop' mc node me neighbours =  do
         loop' mc node me neighbours
     else do
        sendmydistmessage node me 0
-       threadDelay 3000000
-       sendmydistmessage node me 0
-       threadDelay 1000000000000
-       sendmydistmessage node me 0
+       threadDelay 1000000
+       loop' mc node me neighbours
 
