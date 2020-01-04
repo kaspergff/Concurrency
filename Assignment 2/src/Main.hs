@@ -74,6 +74,8 @@ listenForConnections serverSocket lock' node = do
   _ <- forkIO $ handleConnection connection' lock' node
   listenForConnections serverSocket lock' node
 
+
+--this function is used for performing different actions for different types of incomming messages
 handleConnection :: Socket -> Lock -> Node -> IO ()
 handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt,messageCount = mc}) = do
   chandle <- socketToHandle connection' ReadWriteMode
@@ -81,6 +83,7 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
 
   (messagetype,port,content)  <- atomically $ processline line 
   case messagetype of
+    --if a mystatus message is received one is added to a counter which is used to determine if all neighbours are active
     "Mystatus" ->  do
       atomically $ handlemystatus mc
     "Mydist" -> do
@@ -89,11 +92,11 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       when (dis /= oldDistance) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
-
+    --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h
       interlocked lock' $ putStrLn $ "Connected: " ++ show intendedconnection
-
+    --if a stringmessage is received the process checks if is has to be send to the next neighbour for a given destination or if it is intended for the node in question
     "StringMessage" -> do
       --port in this context means the intended destination
       let intendedreceiver = read port :: Int
@@ -111,18 +114,24 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
     _ -> interlocked lock' $ putStrLn ("this message has no valid type and is therefore not sent to any neighbours" ++ line)
   hClose chandle
 
+
+--note that the functions processline,handlemystatus,handlemydist and handleconectrequest are used by handleconnection. they are all made in the STM type so they can be executed actomically in the handleconnection function
+
+--this function is used to disect the incomming messages 
 processline :: String -> STM (String,String,[String])
 processline l = do
   let messagetype' = head (words l)
-  let port'      = words l !! 1 
+  let port'        = words l !! 1 
   let content'     = (words l \\ [messagetype']) \\ [port']
   return (messagetype',port',content')
 
+--this function is used to add one to the active neighbour counter
 handlemystatus :: TVar Int -> STM ()
 handlemystatus mc = do
   mc' <- readTVar mc
   writeTVar mc (mc' + 1) 
 
+--this function is used to activate recompute upon receiving a mydist message
 handlemydist :: [String] -> String -> Node -> STM (Port,Port,Int,Int)
 handlemydist content' port' n@(Node {routingtable = rt, neighbourDistanceTable = nt}) = do
   let v = read (head content') :: Int 
@@ -142,8 +151,6 @@ handleconectrequest port h =  do
   return (intendedconnection)
  
 
-  -------------------- End Template---------------------
-
   --this function is used for looking up which node is the best neighbour when going to a third node
   --the -10000 indicates there is no best neighbour for the given port and the -10000 cannot be found in the handletable so no message will be sent
 findbestneighbour :: Port -> Table -> Port
@@ -158,12 +165,7 @@ updateNdisUTable nt con@(Connection from _ to ) = do
   writeTVar nt $ newList ++ [con]
   return ()
 
-createConnection :: Int -> Connection
-createConnection int  = Connection int 1 int
-     
-initalRtable :: [Int] -> Table
-initalRtable = map createConnection 
-
+--function for adding a single entry of the (Int, IO Handle) type to the handle table
 addToHandleTable :: (TVar HandleTable) -> Int -> IO Handle -> STM ()
 addToHandleTable handletable neighbour handle = do
   htable <- readTVar handletable
@@ -180,7 +182,6 @@ intToHandle i = do
   return chandle
 
 -- funtion to handle input
--- we moeten er op deze plaats voor zien de zorgen dat een functie word aangeroepen voor het printen van de tabel 
 inputHandler :: Node -> Lock -> IO ()
 inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = do
   input <- getLine
@@ -201,11 +202,16 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       inputHandler n lock'
     "C" -> do 
       let handle = intToHandle port
-      h' <- atomically $ readTVar h
-      atomically $ writeTVar h (h' ++ [(port,handle)])
+      atomically $ addToHandleTable h port handle 
       sendmessage (Just handle) ("ConnectRequest " ++ show me)
       interlocked lock' $ putStrLn $ ("Connected: " ++ show port)
       inputHandler n lock'
+    
+    --                                             --
+    --                                             --
+    -- D is debug dus verwijder voor de eindversie --
+    --                                             --
+    --                                             --
     "D" -> do 
       printtabel <- atomically $ readTVar (neighbourDistanceTable n)
       interlocked lock' $ printRtable me printtabel
@@ -214,7 +220,7 @@ inputHandler n@(Node {nodeID = me, routingtable = r, handletable = h}) lock' = d
       putStrLn $ "wrong input"
       inputHandler n lock'
 
--- Needs improvement       
+-- this parser is used to parse the commands given in the console       
 inputParser :: String -> (String, Int, String)
 inputParser []    = ("", 0, "")-- the 0 is an placeholder
 inputParser text  | length split < 2 = (com, 0, "") 
@@ -232,8 +238,9 @@ printRtable :: Int -> Table -> IO ()
 printRtable _ []     = return ()
 printRtable _ table = mapM_ print table
 
--- function to print handle table
--- pls laat staan die kan nog nuttig zijn straks als ik een message moet routen
+---                                                --
+--- DEZE IS OOK DEBUG EN MOET WEG IN DE EINDVERSIE --
+---                                                --
 printHtable :: (Int,IO Handle) -> IO ()
 printHtable (i, iOh) = do
   h <- iOh
@@ -259,7 +266,7 @@ loop' mc node me neighbours =  do
   messagecount' <- atomically $ readTVar mc
   if messagecount' /=  length neighbours
     then do
-        threadDelay 2500000
+        threadDelay 2000000
         loop' mc node me neighbours
     else do
        sendmydistmessage node me 0
