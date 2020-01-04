@@ -90,7 +90,9 @@ handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceT
       when (dis /= oldDistance && dis <= 24) $ do 
         sendmydistmessage n too dis
         interlocked lock'$ putStrLn $ "Distance to " ++ show too ++ " is now " ++  show dis ++ " via " ++show via
+      when (dis /= oldDistance && dis => 24) $  interlocked lock'$ putStrLn $ "Unreachable: "++ show too
       
+
     --if a connectrequest message is received the node adds the sending node and its handle to the handletable for future communications
     "ConnectRequest" -> do
       (intendedconnection) <- atomically $ handleconectrequest port h
