@@ -4,7 +4,6 @@ import Control.Concurrent.STM
 import Control.Exception
 import System.IO
 import Data.List
-import Data.Ord (comparing)
 
 recompute :: Node -> Port -> STM (Port,Int,String)    
 recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable}) int = do
@@ -18,7 +17,7 @@ recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable
         let d = _d + 1
         if d < 24 
             then do 
-                addToRoutingTable r (Connection too (d) from) 
+                addToRoutingTable r (Connection too d from) 
                 return (too,d,show from)
         else do
             addToRoutingTable r (Connection too 24 (-2))
@@ -26,12 +25,12 @@ recompute (Node {nodeID = me, routingtable = r ,neighbourDistanceTable = bnTable
         
 
 
-getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> STM (Connection)
+getMinDistanceFromNBto :: NeighbourDistanceTable -> Port -> STM Connection
 getMinDistanceFromNBto tb p = do
     let filterList = filter (\(Connection _ _ t)-> t == p) tb
-        sortList   = sortBy (comparing (\(Connection _ dis _)->dis)) filterList
+        sortList   = sortOn (\(Connection _ dis _)->dis) filterList
 
-    if length sortList > 0
+    if not (null sortList) 
         then return (head sortList)
     else return (Connection (-2) 24 p)
 
@@ -41,7 +40,7 @@ getMinDistanceFromNBto tb p = do
 addToRoutingTable :: TVar Table -> Connection -> STM ()
 addToRoutingTable rt con@(Connection to _ _) = do
     table <- readTVar rt
-    if (length table) < 1
+    if length table < 1
         then writeTVar rt $ table ++ [con]
     else do
         let newList = filter (\(Connection x _ _) -> x /= to) table
@@ -53,34 +52,35 @@ getDistanceToPortFromRoutingTable rt des = do
     let check' = find (\(Connection x _ _) -> x == des) rt
     case check' of
         Just (Connection _ dis _) -> dis
-        Nothing -> (24)
+        Nothing -> 24
 
-sendmydistmessage :: Node -> Int -> Int -> IO()
-sendmydistmessage node to dist = do
-    (message, justreceivers) <- atomically $ getdistdetails node to dist
-    mapM_ (flip sendmessage message ) justreceivers 
+sendMyDistMessage :: Node -> Int -> Int -> IO()
+sendMyDistMessage node to dist = do
+    (message, justreceivers) <- atomically $ getDistDetails node to dist
+    mapM_ (flip sendMessage message ) justreceivers 
 
-getdistdetails :: Node -> Int -> Int -> STM (String, [Maybe (IO Handle)])
-getdistdetails (Node {nodeID = id', handletable = h}) to dist = do
+getDistDetails :: Node -> Int -> Int -> STM (String, [Maybe (IO Handle)])
+getDistDetails (Node {nodeID = id', handletable = h}) to dist = do
     h' <- readTVar h
     let receivers = map snd h'
-    let message = ("Mydist " ++ show id' ++ " " ++ show to ++ " " ++ show dist)
-    let justreceivers = map (\x -> (Just x)) receivers
+    let message = "Mydist " ++ show id' ++ " " ++ show to ++ " " ++ show dist
+    let justreceivers = map Just receivers
     return (message,justreceivers)
 
     
-sendmessage :: Maybe (IO Handle) -> String -> IO ()
-sendmessage (Just x) message = do
+sendMessage :: Maybe (IO Handle) -> String -> IO ()
+sendMessage (Just x) message = do
     x' <- x
     hSetBuffering x' LineBuffering
-    hPutStrLn x' $ id message
-sendmessage (Nothing) _ = putStrLn $ show  "error message"
+    hPutStrLn x' $ message
+sendMessage Nothing _ = print  "error message"
 
-sendmystatusmessage (Node {handletable = h,nodeID = id'}) = do
+sendMyStatusMessage :: Node -> IO()
+sendMyStatusMessage (Node {handletable = h}) = do
     h' <- atomically $ readTVar h
     let receivers = map snd h'
     let message = "Mystatus "
-    let justreceivers = map (\x -> (Just x)) receivers
-    mapM_ (flip sendmessage message ) justreceivers 
+    let justreceivers = map Just receivers
+    mapM_ (flip sendMessage message ) justreceivers 
 
 
