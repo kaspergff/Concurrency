@@ -328,8 +328,8 @@ fail' n@(Node {handletable = h}) port lock' handle = do
   --doe hclose met doosje handle
 
   -- remove the node as neigbour == set distance in routingtable to 24
-  ndisu <- atomically $ readTVar (neighbourDistanceTable n)
-  atomically $ writeTVar (neighbourDistanceTable n) (map (\con@(Connection from _ to)->
+  ndisu <- atomically $ readTVar (routingtable n)
+  atomically $ writeTVar (routingtable n) (map (\con@(Connection from _ to)->
     if from == port && to == port
       then updateDistance con 24 
     else con) ndisu) 
