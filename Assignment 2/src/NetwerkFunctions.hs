@@ -1,8 +1,7 @@
 module NetwerkFunctions where
-
 import Structure  
 import Control.Concurrent.STM
-
+import Control.Exception
 import System.IO
 import Data.List
 

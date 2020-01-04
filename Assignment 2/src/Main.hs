@@ -27,13 +27,13 @@ main = do
   setSocketOption serverSocket ReuseAddr 1
   bind serverSocket $ portToAddress me
   listen serverSocket 1024
-  -- handle table
-  htabel <- newTVarIO $ connection neighbours
   -- initialization
   routingTabel    <- newTVarIO $ [Connection me 0 (-1)]
   messagecount    <- newTVarIO $ 0
   nbDistanceTable <- newTVarIO  []
-
+   -- handle table
+  htabel <- newTVarIO $ connection neighbours
+  threadDelay 500
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable messagecount 
   -- Let a seperate thread listen for incomming connections
