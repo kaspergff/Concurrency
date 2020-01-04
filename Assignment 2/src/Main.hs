@@ -6,15 +6,11 @@ import Structure
 import Control.Monad (when)
 import Control.Concurrent
 import Control.Concurrent.STM
---import Control.Concurrent.STM.TVar
 import Control.Exception
---import Data.IORef
 import System.Environment
 import System.IO
 import Network.Socket
 import Data.List
---import Data.Tuple
-
 
 main :: IO ()
 main = do
@@ -40,19 +36,16 @@ main = do
 
   -- make an instance of the node datatype which contains all info in this thread 
   let node = Node me routingTabel htabel nbDistanceTable messagecount 
-
   -- Let a seperate thread listen for incomming connections
   _ <- forkIO $ listenForConnections serverSocket lock' node
   -- -- Part 2 input
   _ <- forkIO $ inputHandler node lock'
-
     -- sendstatusmessage
   sendmystatusmessage node 
-
     -- send message MyDist
+    -- this loop is used to make sure a node only sends out its mydistmessages when al its initial neighbours are online
   loop' messagecount node me neighbours
  
-
 readCommandLineArguments :: IO (Int, [Int])
 readCommandLineArguments = do
   args <- getArgs
@@ -83,9 +76,7 @@ listenForConnections serverSocket lock' node = do
 
 handleConnection :: Socket -> Lock -> Node -> IO ()
 handleConnection connection' lock' n@(Node {handletable = h , neighbourDistanceTable = nt, nodeID = id',routingtable = rt,messageCount = mc}) = do
-  --interlocked lock $ putStrLn "// Got new incomming connection"
   chandle <- socketToHandle connection' ReadWriteMode
-  -- hPutStrLn chandle "// Welcome"
   line <- hGetLine chandle
 
   (messagetype,port,content)  <- atomically $ processline line 
@@ -163,11 +154,9 @@ findbestneighbour distandneighbour ((Connection x _ y):xs) | distandneighbour ==
 updateNdisUTable :: TVar NeighbourDistanceTable -> Connection -> STM ()
 updateNdisUTable nt con@(Connection from _ to ) = do
   table <- readTVar nt
-  let newList = filterNot (\(Connection from' _ to') -> to' == to && from' == from) table
+  let newList = filter ( not.(\(Connection from' _ to') -> to' == to && from' == from)) table
   writeTVar nt $ newList ++ [con]
   return ()
-
-filterNot f = filter (not . f)
 
 createConnection :: Int -> Connection
 createConnection int  = Connection int 1 int

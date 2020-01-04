@@ -2,6 +2,7 @@ module NetwerkFunctions where
 
 import Structure  
 import Control.Concurrent.STM
+
 import System.IO
 import Data.List
 
