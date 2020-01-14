@@ -23,10 +23,10 @@ type Line = (Point, Point)
 type SegmentedPoints = (Vector Bool, Vector Point)
 
 pointIsLeftOfLine :: Exp Line -> Exp Point -> Exp Bool
-pointIsLeftOfLine (T2 (T2 x1 y1) (T2 x2 y2)) (T2 x y) = nx * x + ny * y > c
+pointIsLeftOfLine (T2 (T2 x1 y1) (T2 x2 y2)) (T2 x y) = nx *x + ny * y > c
   where
     nx = y1 - y2
-    ny = x2 - x1
+    ny = x2 - x1 
     c = nx * x1 + ny * y1
 
 nonNormalizedDistance :: Exp Line -> Exp Point -> Exp Int
@@ -38,10 +38,11 @@ nonNormalizedDistance (T2 (T2 x1 y1) (T2 x2 y2)) (T2 x y) = nx * x + ny * y - c
 
 -- * Exercise 1
 leftMostPoint :: Acc (Vector Point) -> Acc (Scalar Point)
-leftMostPoint = fold min $ T2 maxBound maxBound
+leftMostPoint = fold min (T2 maxBound maxBound)
 
 rightMostPoint :: Acc (Vector Point) -> Acc (Scalar Point)
-rightMostPoint = fold max $ T2 minBound minBound
+rightMostPoint = fold max (T2 minBound minBound)
+
 
 initialPartition :: Acc (Vector Point) -> Acc SegmentedPoints
 initialPartition points =
@@ -52,14 +53,15 @@ initialPartition points =
 
     -- * Exercise 2
     isUpper :: Acc (Vector Bool)
-    isUpper = undefined
+    isUpper = map (pointIsLeftOfLine line) points
 
+    -- Need Refactoring solution is not correct
     isLower :: Acc (Vector Bool)
-    isLower = undefined
+    isLower = map (pointIsLeftOfLine (T2 p2 p1)) points
 
     -- * Exercise 3
     lowerIndices :: Acc (Vector Int)
-    lowerIndices = undefined
+    lowerIndices = prescanl (+) 0 (map boolToInt isLower)
 
     -- * Exercise 4
     upperIndices :: Acc (Vector Int)
