@@ -38,10 +38,10 @@ nonNormalizedDistance (T2 (T2 x1 y1) (T2 x2 y2)) (T2 x y) = nx * x + ny * y - c
 
 -- * Exercise 1
 leftMostPoint :: Acc (Vector Point) -> Acc (Scalar Point)
-leftMostPoint = fold min (T2 maxBound maxBound)
+leftMostPoint = fold min $ T2 maxBound maxBound
 
 rightMostPoint :: Acc (Vector Point) -> Acc (Scalar Point)
-rightMostPoint = fold max (T2 minBound minBound)
+rightMostPoint = fold max $ T2 minBound minBound
 
 initialPartition :: Acc (Vector Point) -> Acc SegmentedPoints
 initialPartition points =
