@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 
+
 module Quickhull
     ( quickhull
     , Point
@@ -55,9 +56,9 @@ initialPartition points =
     isUpper :: Acc (Vector Bool)
     isUpper = map (pointIsLeftOfLine line) points
 
-    -- Need Refactoring solution is not correct
     isLower :: Acc (Vector Bool)
-    isLower = map (pointIsLeftOfLine (T2 p2 p1)) points
+    isLower = zipWith (\a b -> ifThenElse (a == p1 || a == p2) b (not b)) points isUpper
+    
 
     -- * Exercise 3
     lowerIndices :: Acc (Vector Int)
@@ -66,7 +67,7 @@ initialPartition points =
     -- * Exercise 4
     upperIndices :: Acc (Vector Int)
     countUpper :: Acc (Scalar Int)
-    T2 upperIndices countUpper = undefined
+    T2 upperIndices countUpper = scanl' (+) 0 (map boolToInt isUpper)
 
     -- * Exercise 5
     permutation :: Acc (Vector (Z :. Int))
@@ -74,13 +75,20 @@ initialPartition points =
       let
         f :: Exp Point -> Exp Bool -> Exp Int -> Exp Int -> Exp (Z :. Int)
         f p upper idxLower idxUpper
-          = undefined
+          = ifThenElse (p == p1) (index1 0) $
+            ifThenElse (upper) (index1 (1 + idxUpper)) $
+            ifThenElse (p == p2) (index1 (1 + the countUpper)) $
+            index1 (2 + (the countUpper) + idxLower)
       in
         zipWith4 f points isUpper lowerIndices upperIndices
 
     -- * Exercise 6
     empty :: Acc (Vector Point)
-    empty = undefined
+    empty = fill sha p1
+        where 
+            len = 1 + length permutation 
+            sha = index1 len
+
 
     newPoints :: Acc (Vector Point)
     newPoints = permute const empty (permutation !) points
