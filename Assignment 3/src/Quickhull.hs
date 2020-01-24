@@ -134,13 +134,20 @@ propagateR = segmentedPostscanr (P.flip const)
 propagateLine :: Acc SegmentedPoints -> Acc (Vector Line)
 propagateLine (T2 headFlags points) = zip (propagateL headFlags points) (propagateR headFlags points)
 
-
 -- * Exercise 11
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
-shiftHeadFlagsL flags = undefined
+shiftHeadFlagsL flags = (tail flags) ++ scalarFalse
 
 shiftHeadFlagsR :: Acc (Vector Bool) -> Acc (Vector Bool)
-shiftHeadFlagsR flags = undefined
+shiftHeadFlagsR flags = scalarFalse ++ (init flags)
+
+-- helper function for exercise 11
+scalarFalse :: Acc ( Vector Bool)
+scalarFalse = fill (constant (Z :. 1)) (lift False)
+
+-- use for debug
+-- foo :: Acc ( Vector Bool)
+-- foo = fill (constant (Z :. 10)) (lift True)
 
 partition :: Acc SegmentedPoints -> Acc SegmentedPoints
 partition (T2 headFlags points) =
