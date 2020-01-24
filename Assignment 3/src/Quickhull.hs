@@ -113,15 +113,16 @@ initialPartition points =
 
 -- * Exercise 8
 segmentedPostscanl :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-segmentedPostscanl f vec seg = map snd $ postscanl (\a b -> segmented f a b) Unsafe.undef (zip vec seg)
+segmentedPostscanl f vec seg = map snd $ postscanl (segmented f) Unsafe.undef (zip vec seg)
+    where
+        segmented ::  Elt a => (Exp a -> Exp a -> Exp a) -> (Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)) 
+        segmented op (T2 fx x) (T2 fy y) = T2 ( fx || fy ) ( fy ? (y, op x y) )
  
 segmentedPostscanr :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-segmentedPostscanr f vec seg = map snd $ postscanr (\a b -> segmented f a b) Unsafe.undef (zip vec seg)
-
--- helper function for excercise 8
-segmented ::  Elt a => (Exp a -> Exp a -> Exp a) -> (Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)) 
-segmented op (T2 fx x) (T2 fy y) = T2 ( fx || fy ) ( fy ? (y, op x y) )
-
+segmentedPostscanr f vec seg = map snd $ postscanr (segmented f) Unsafe.undef (zip vec seg)
+    where
+        segmented ::  Elt a => (Exp a -> Exp a -> Exp a) -> (Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)) 
+        segmented op (T2 fx x) (T2 fy y) = T2 ( fy || fx ) ( fx ? (x, op x y) )
 
 -- * Exercise 9
 propagateL :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
@@ -132,7 +133,7 @@ propagateR = segmentedPostscanr (P.flip const)
 
 -- * Exercise 10
 propagateLine :: Acc SegmentedPoints -> Acc (Vector Line)
-propagateLine (T2 headFlags points) = zip (propagateL headFlags points) (propagateR headFlags points)
+propagateLine (T2 headFlags points) = zip (propagateL headFlags points) (propagateR headFlags points) 
 
 -- * Exercise 11
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
@@ -160,7 +161,9 @@ partition (T2 headFlags points) =
 
     -- * Exercise 12
     furthest :: Acc (Vector Point)
-    furthest = undefined
+    furthest = map snd $ propagateL headFlagsR $ segmentedPostscanl max headFlagsL disToLine
+        where
+            disToLine = zipWith (\a b -> T2 (nonNormalizedDistance b a) a) points vecLine
 
     -- * Exercise 13
     isLeft :: Acc (Vector Bool)
@@ -209,7 +212,8 @@ partition (T2 headFlags points) =
     newHeadFlags :: Acc (Vector Bool)
     newHeadFlags = undefined
   in
-    T2 newHeadFlags newPoints
+    error $ P.show $ run furthest 
+    --T2 newHeadFlags newPoints
 
 -- * Exercise 20
 condition :: Acc SegmentedPoints -> Acc (Scalar Bool)
