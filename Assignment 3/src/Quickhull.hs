@@ -17,6 +17,11 @@ import Data.Array.Accelerate.Interpreter
 -- import Data.Array.Accelerate.LLVM.Native
 -- import Data.Array.Accelerate.LLVM.PTX
 
+
+-- for debug
+input1 :: Acc (Vector Point)
+input1 = use $ fromList (Z :. 15) [(1,4),(8,19),(5,9),(7,9),(4,2),(3,9),(9,16),(1,5),(9,11),(4,0),(8,18),(8,7),(7,18),(6,18),(4,19)]
+
 type Point = (Int, Int)
 
 type Line = (Point, Point)
@@ -95,9 +100,12 @@ initialPartition points =
 
     -- * Exercise 7
     headFlags :: Acc (Vector Bool)
-    headFlags = undefined
+    headFlags = map (\a-> ifThenElse (a == p1 || a == p2) (lift True) (lift False)) newPoints
   in
+    -- debug
+    --error $ P.show $ run headFlags
     T2 headFlags newPoints
+    
 
 -- * Exercise 8
 segmentedPostscanl :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
