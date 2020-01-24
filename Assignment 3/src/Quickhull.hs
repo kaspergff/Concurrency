@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 
 module Quickhull
@@ -22,6 +24,8 @@ import Data.Array.Accelerate.Interpreter
 input1 :: Acc (Vector Point)
 input1 = use $ fromList (Z :. 15) [(1,4),(8,19),(5,9),(7,9),(4,2),(3,9),(9,16),(1,5),(9,11),(4,0),(8,18),(8,7),(7,18),(6,18),(4,19)]
 
+test :: Acc (Vector Int)
+test = use $ fromList (Z :. 4) [1,2,3,4,5] 
 type Point = (Int, Int)
 
 type Line = (Point, Point)
@@ -109,10 +113,15 @@ initialPartition points =
 
 -- * Exercise 8
 segmentedPostscanl :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-segmentedPostscanl = undefined
-
+segmentedPostscanl f vec seg = map snd $ postscanl (\a b -> segmented f a b) Unsafe.undef (zip vec seg)
+ 
 segmentedPostscanr :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
-segmentedPostscanr = undefined
+segmentedPostscanr f vec seg = map snd $ postscanr (\a b -> segmented f a b) Unsafe.undef (zip vec seg)
+
+-- helper function for excercise 8
+segmented ::  Elt a => (Exp a -> Exp a -> Exp a) -> (Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)) 
+segmented op (T2 fx x) (T2 fy y) = T2 ( fx || fy ) ( fy ? (y, op x y) )
+
 
 -- * Exercise 9
 propagateL :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
@@ -123,10 +132,8 @@ propagateR = segmentedPostscanr (P.flip const)
 
 -- * Exercise 10
 propagateLine :: Acc SegmentedPoints -> Acc (Vector Line)
-propagateLine (T2 headFlags points) = zip vecP1 vecP2
-  where
-    vecP1 = propagateL headFlags points
-    vecP2 = propagateR headFlags points
+propagateLine (T2 headFlags points) = zip (propagateL headFlags points) (propagateR headFlags points)
+
 
 -- * Exercise 11
 shiftHeadFlagsL :: Acc (Vector Bool) -> Acc (Vector Bool)
