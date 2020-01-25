@@ -116,13 +116,13 @@ segmentedPostscanl :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) ->
 segmentedPostscanl f vec seg = map snd $ postscanl (segmented f) Unsafe.undef (zip vec seg)
     where
         segmented ::  Elt a => (Exp a -> Exp a -> Exp a) -> (Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)) 
-        segmented op (T2 fx x) (T2 fy y) = T2 ( fx || fy ) ( fy ? (y, op x y) )
+        segmented op (T2 fx x) (T2 fy y) = T2 ( fx || fy ) ( fy ? (y, op x y))
  
 segmentedPostscanr :: Elt a => (Exp a -> Exp a -> Exp a) -> Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
 segmentedPostscanr f vec seg = map snd $ postscanr (segmented f) Unsafe.undef (zip vec seg)
     where
         segmented ::  Elt a => (Exp a -> Exp a -> Exp a) -> (Exp (Bool, a) -> Exp (Bool, a) -> Exp (Bool, a)) 
-        segmented op (T2 fx x) (T2 fy y) = T2 ( fy || fx ) ( fx ? (x, op x y) )
+        segmented op (T2 fx x) (T2 fy y) = T2 ( fx || fy ) ( fx ? (x, op x y) )
 
 -- * Exercise 9
 propagateL :: Elt a => Acc (Vector Bool) -> Acc (Vector a) -> Acc (Vector a)
@@ -161,27 +161,32 @@ partition (T2 headFlags points) =
 
     -- * Exercise 12
     furthest :: Acc (Vector Point)
-    furthest = map snd $ propagateL headFlagsR $ segmentedPostscanl max headFlagsL disToLine
+    furthest = propagateR headFlagsL $ map snd $ segmentedPostscanl max headFlagsR disToLine
         where
             disToLine = zipWith (\a b -> T2 (nonNormalizedDistance b a) a) points vecLine
 
     -- * Exercise 13
     isLeft :: Acc (Vector Bool)
-    isLeft = undefined
+    isLeft = zipWith3 (\(T2 p1 _) pf point -> pointIsLeftOfLine (T2 p1 pf) point) vecLine furthest points
 
     isRight :: Acc (Vector Bool)
-    isRight = undefined
+    isRight = zipWith3 (\(T2 _ p2) pf point -> pointIsLeftOfLine (T2 pf p2) point) vecLine furthest points
 
     -- * Exercise 14
     segmentIdxLeft :: Acc (Vector Int)
-    segmentIdxLeft = undefined
+    segmentIdxLeft = segmentedPostscanl (+) headFlags (map getNumValue isLeft)
 
     segmentIdxRight :: Acc (Vector Int)
-    segmentIdxRight = undefined
+    segmentIdxRight = segmentedPostscanl (+) headFlags (map getNumValue isRight)
 
+    -- helper function for execise 14 for going from boolean value to an int value
+    getNumValue ::  Exp Bool -> Exp Int
+    getNumValue b = ifThenElse (b) (1) (0)
+                 
     -- * Exercise 15
+    -- je kan dus die segmentInxLeft gebruiken omdat die dus cumulatief bijhoudt hoeveel van die punten left zijn, als je die flags eentje opschuift naar links krijg je dus de meest rechter waarde van een segment, die meest rechter waarde is de hoeveelheid van punten die links zijn in het segment
     countLeft :: Acc (Vector Int)
-    countLeft = undefined
+    countLeft = propagateR headFlagsL segmentIdxLeft
 
     -- * Exercise 16
     segmentSize :: Acc (Vector Int)
@@ -212,7 +217,8 @@ partition (T2 headFlags points) =
     newHeadFlags :: Acc (Vector Bool)
     newHeadFlags = undefined
   in
-    error $ P.show $ run furthest 
+    error $ P.show $ run furthest
+
     --T2 newHeadFlags newPoints
 
 -- * Exercise 20
