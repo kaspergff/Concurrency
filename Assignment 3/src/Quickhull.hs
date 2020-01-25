@@ -188,13 +188,21 @@ partition (T2 headFlags points) =
     countLeft :: Acc (Vector Int)
     countLeft = propagateR headFlagsL segmentIdxLeft
 
-    -- * Exercise 16
-    segmentSize :: Acc (Vector Int)
-    segmentSize = undefined
+    countRight :: Acc (Vector Int)
+    countRight = propagateR headFlagsL segmentIdxRight
 
+    -- * Exercise 16
+    -- als de huidige flag true is dan is het resultaat, als de volgende flag true is dan is het huidige punt de laatste van het segment en is de resulterende waarde van dat veld de som van countright + countleft + 1 
+    segmentSize :: Acc (Vector Int)
+    segmentSize = zipWith4 (\flag flag1 cright cntleft -> segmentSize' flag flag1 cright cntleft) headFlags headFlagsL countRight countLeft
+      where 
+        segmentSize' flag flag1 cright cntLeft  = ifThenElse (flag) (1) $
+                                                  ifThenElse (flag1) (cright+cntLeft+1) (0)
+
+    --de segment offset is de som van alle voorgaande segmentgroottes
     segmentOffset :: Acc (Vector Int)
     size :: Acc (Scalar Int)
-    T2 segmentOffset size = undefined
+    T2 segmentOffset size = scanl' (+) 0 segmentSize 
 
     -- * Exercise 17
     permutation :: Acc (Vector (Z :. Int))
@@ -217,7 +225,7 @@ partition (T2 headFlags points) =
     newHeadFlags :: Acc (Vector Bool)
     newHeadFlags = undefined
   in
-    error $ P.show $ run furthest
+    error $ P.show $ run segmentOffset
 
     --T2 newHeadFlags newPoints
 
