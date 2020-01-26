@@ -161,9 +161,9 @@ partition (T2 headFlags points) =
 
     -- * Exercise 12
     furthest :: Acc (Vector Point)
-    furthest = map snd $ propagateL headFlagsR $ segmentedPostscanl max headFlagsL disToLine
-        where
-            disToLine = zipWith (\a b -> T2 (nonNormalizedDistance b a) a) points vecLine
+    furthest = 
+        let disToLine = zipWith (\a b -> T2 (nonNormalizedDistance b a) a) points vecLine
+        in map snd $ propagateR headFlags $ segmentedPostscanl max headFlagsR disToLine
 
     -- * Exercise 13
     isLeft :: Acc (Vector Bool)
