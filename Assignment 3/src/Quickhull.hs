@@ -155,9 +155,9 @@ partition (T2 headFlags points) =
 
     -- * Exercise 12
     furthest :: Acc (Vector Point)
-    furthest = propagateR headFlagsL $ map snd $ segmentedPostscanl max headFlagsR disToLine
-        where
-            disToLine = zipWith (\a b -> T2 (nonNormalizedDistance b a) a) points vecLine
+    furthest = 
+        let disToLine = zipWith (\a b -> T2 (nonNormalizedDistance b a) a) points vecLine
+        in map snd $ propagateR headFlags $ segmentedPostscanl max headFlagsR disToLine
 
     -- * Exercise 13
     isLeft  :: Acc (Vector Bool)
@@ -229,16 +229,16 @@ partition (T2 headFlags points) =
   
   in
   
-    error $ P.show $ run newPoints
-    --T2 newHeadFlags newPoints
+    --error $ P.show $ run newPoints
+    T2 newHeadFlags newPoints
 
--- * Exercise 20
+-- * Exercise 20 
 condition :: Acc SegmentedPoints -> Acc (Scalar Bool)
-condition = undefined
+condition segp = map not $ fold1All (&&) (afst segp)
 
 -- * Exercise 21
 quickhull' :: Acc (Vector Point) -> Acc (Vector Point)
-quickhull' = undefined
+quickhull' inp = asnd $ awhile condition partition $ initialPartition inp
 
 quickhull :: Vector Point -> Vector Point
 quickhull = run1 quickhull'
