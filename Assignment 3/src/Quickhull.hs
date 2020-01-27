@@ -54,8 +54,8 @@ rightMostPoint = fold max (T2 minBound minBound)
 initialPartition :: Acc (Vector Point) -> Acc SegmentedPoints
 initialPartition points =
   let
-    p1 = the $ leftMostPoint points
-    p2 = the $ rightMostPoint points
+    p1   = the $ leftMostPoint points
+    p2   = the $ rightMostPoint points
     line = T2 p1 p2
 
     -- * Exercise 2
@@ -222,8 +222,13 @@ partition (T2 headFlags points) =
 
     -- * Exercise 19
     newHeadFlags :: Acc (Vector Bool)
-    newHeadFlags = undefined
+    newHeadFlags = permute const boolvector (permutation !) $ zipWith3 (\point flag far -> (ifThenElse (flag || point==far) (constant True) (constant False))) points headFlags furthest
+
+    boolvector :: Acc (Vector Bool)
+    boolvector = fill (index1 $ the size) $ constant False
+  
   in
+  
     error $ P.show $ run newPoints
     --T2 newHeadFlags newPoints
 
