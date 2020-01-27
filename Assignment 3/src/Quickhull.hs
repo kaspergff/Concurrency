@@ -222,18 +222,18 @@ partition (T2 headFlags points) =
 
     -- * Exercise 19
     newHeadFlags :: Acc (Vector Bool)
-    newHeadFlags = undefined
+    newHeadFlags = permute const scalarFalse (permutation !)  $ zipWith3 (\a b fur -> ifThenElse (b || a==fur) (lift True) (lift False) ) points headFlags furthest
   in
-    error $ P.show $ run newPoints
-    --T2 newHeadFlags newPoints
+    --error $ P.show $ run newPoints
+    T2 newHeadFlags newPoints
 
--- * Exercise 20
+-- * Exercise 20 
 condition :: Acc SegmentedPoints -> Acc (Scalar Bool)
-condition = undefined
+condition segp = map not $ fold1All (&&) (afst segp)
 
 -- * Exercise 21
 quickhull' :: Acc (Vector Point) -> Acc (Vector Point)
-quickhull' = undefined
+quickhull' inp = asnd $ awhile condition partition $ initialPartition inp
 
 quickhull :: Vector Point -> Vector Point
 quickhull = run1 quickhull'
